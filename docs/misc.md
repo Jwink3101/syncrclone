@@ -64,3 +64,21 @@ $ syncrclone --break-lock both <config_file.py>
     * If not rerun, files that are later deleted may be be restored upon sync since syncrclone won't know that they previously existed.
 
 While this should be safe from any issues, it is suggested that you keep backups! It's even a good idea to run a backup before and after sync if you're really concerned!
+
+
+## Multiple Repos
+
+syncrclone does pair-wise sync but it can also do any pair-wise topology. The only important note is that **each pair must have a unique name**.
+
+A star-topology is probably the easiest and most resilient to conflicts but as long at the name is changed, syncrclone can push or pull from any two remotes and keep them in sync.
+
+
+
+
+
+
+
+
+
+
+

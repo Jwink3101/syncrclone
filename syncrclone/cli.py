@@ -109,10 +109,15 @@ class Config:
         
         
     def __repr__(self):
-        # Need to watch out for RCLONE_CONFIG_PASS in 
-        cfg = copy.deepcopy(self._config)
+        # Need to watch out for RCLONE_CONFIG_PASS in rclone_env
+        # make a copy of the dict fixing that one but do not
+        # just do a deepcopy in case the user imported modules
+        cfg = self._config.copy()
+        cfg['rclone_env'] = cfg['rclone_env'].copy()
+        
         if 'RCLONE_CONFIG_PASS' in cfg.get('rclone_env',{}):
             cfg['rclone_env']['RCLONE_CONFIG_PASS'] = '**REDACTED**'
+
         return ''.join([
             'Config(', 
             ', '.join(f'{k}={repr(v)}' for k,v in cfg.items() if not k.startswith('_')),

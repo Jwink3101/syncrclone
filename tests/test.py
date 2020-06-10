@@ -716,9 +716,35 @@ def test_local_mode():
     assert test.compare_tree() == set()
     assert set(testutils.tree('A')) == {'A/file1.txt', 'A/file2.txt'}
     assert test.read('A/file1.txt') == 'file1append'
-        
 
+def test_redacted_PW_and_modules_in_config_file():
+    """
+    Tests that RCLONE_CONFIG_PASS is redacted in debug mode. (even though
+    it isn't needed. rclone will just ignore it)
+    
+    Also tests when you import modules in the config since that was
+    an issue and has now been fixed.
+    """
+    test = testutils.Tester('redact','A','B')
+    
+    ## Config
+    test.config.rclone_env.update({'RCLONE_CONFIG_PASS':'you_cant_see_me'})
+    test.write_config()
+    
+    # Add module imports to test a regression
+    with open(test.config._configpath,'at') as file:
+        print('\nimport os,sys,subprocess,math,time',file=file)
 
+    test.write_pre('A/test','test')
+    # sync with debug and then look at the log
+    test.setup(flags=['--debug'])
+    stdout = ''.join(test.synclogs[-1])
+    
+    assert 'RCLONE_CONFIG_PASS' in stdout,'not debug'
+    assert '**REDACTED**' in stdout,'redacted not seen'
+    assert 'you_cant_see_me' not in stdout,'I see your password!'
+    
+    
 if __name__ == '__main__':
     test_main('A','inode','cryptB:','mtime','mtime')
     test_main('cryptA:','size','cryptB:','mtime','mtime')
@@ -737,6 +763,7 @@ if __name__ == '__main__':
     test_three_way()
     test_locks()
     test_local_mode()
+    test_redacted_PW_and_modules_in_config_file()
 
     print('*'*80)
     print(' ALL PASSED')

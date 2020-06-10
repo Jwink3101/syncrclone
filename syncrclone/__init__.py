@@ -1,4 +1,4 @@
-__version__ = '20200610.0.BETA'
+__version__ = '20200610.1.BETA'
 
 import time
 import io
@@ -42,7 +42,6 @@ class Log:
         log('---- END OF LOG ----')
         with open(path,mode) as file:
             file.write(''.join(self.hist))
-    
     
 log = Log()
 
