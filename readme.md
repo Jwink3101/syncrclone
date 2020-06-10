@@ -36,12 +36,12 @@ First, [install rclone](https://rclone.org/install/). Then, you must have python
 
 Install syncrclone:
 
-    $ python -m pip install git+https://syncrclone
+    $ python -m pip install git+https://github.com/Jwink3101/syncrclone
 
 or, if you need to specify a specific python version (must be 3.6 or greater), do
 
-    $ python3.6 -m pip install git+https://syncrclone
-
+    $ python3.6 -m pip install git+https://github.com/Jwink3101/syncrclone
+    
 Configure rclone: I prefer to specify a config file using `--config rclone.cfg`. Add the remotes you wish to sync
 
 Initiate syncrclone: (see "Local and Remote Mode" below)
