@@ -743,7 +743,54 @@ def test_redacted_PW_and_modules_in_config_file():
     assert 'RCLONE_CONFIG_PASS' in stdout,'not debug'
     assert '**REDACTED**' in stdout,'redacted not seen'
     assert 'you_cant_see_me' not in stdout,'I see your password!'
+
+def test_and_demo_exclude_if_present():
+    """
+    The --exclude-if-present can lead to issues as the filters cannot be applied
+    symmetrically to both sides and can make an exclude look like a delete
     
+    Demonstrate (a) it working properly when on both sides and (b)
+    the issues it can cause
+    
+    """
+    test = testutils.Tester('exclude_present','A','B')
+    
+    test.config.filter_flags = ['--exclude-if-present','ignore']
+    test.write_config()
+    
+    ## Working properly
+    test.write_pre('A/file1','file1')
+
+    test.write_pre('A/sub/file2','file2')
+    test.write_pre('A/sub/ignore','')
+    
+    test.write_pre('A/sub2/file3','file3')
+    
+    test.setup()
+    
+    test.write_post('A/sub/onA','onA')
+    test.write_post('B/sub/onB','onB')
+    
+    print('-='*40);print('=-'*40)
+    test.sync()
+    
+    diffs = test.compare_tree()
+    assert diffs == {('missing_inB', 'sub/onA'), ('missing_inA', 'sub/onB')},'exclude did not work'
+    
+    ## Demonstrate the issue
+    test.write_post('B/sub2/ignore','')
+    
+    test.sync()
+    stdout = ''.join(test.synclogs[-1])
+    
+    # This will cause A/sub2/file3 to be deleted on A but remain on B
+    diffs = test.compare_tree()
+    assert {('missing_inA', 'sub2/ignore'),  # The ignore file isn't transfered
+            ('missing_inA', 'sub2/file3'),   # It was deleted on A
+            ('missing_inA', 'sub/onB'),  # These were from before   
+            ('missing_inB', 'sub/onA')} == diffs
+    
+    assert "WARNING '--exclude-if-present' can cause issues. See readme" in stdout
     
 if __name__ == '__main__':
     test_main('A','inode','cryptB:','mtime','mtime')
@@ -764,6 +811,7 @@ if __name__ == '__main__':
     test_locks()
     test_local_mode()
     test_redacted_PW_and_modules_in_config_file()
+    test_and_demo_exclude_if_present()
 
     print('*'*80)
     print(' ALL PASSED')

@@ -99,13 +99,24 @@ $ syncrclone ../../../.syncrclone/config.py
 
 All filtering is handled by rclone's filtering. See their [detailed documentation](https://rclone.org/filtering/).
 
-Filter flags should be set *only* in the config `filter_flags` section. There are many options for filtering such as `--exclude path` or even allowing for specific directories to be excluded based on a file (e.g. [`--exclude-if-present`][eifp])
+Filter flags should be set *only* in the config `filter_flags` section. There are many options for filtering such as `--exclude path`. See note below about `--exclude-if-present`.
 
-[eifp]:https://rclone.org/filtering/#exclude-directory-based-on-a-file
 
 Remember that rclone is called from the same directory as the config file so make sure paths for flags such as `--filter-from` are correctly specified.
 
 See more on Filters in the [config tips](docs/config_tips.md)
+
+### Exclude if Present Filters: A Warning
+
+Filters work well since they are applied to both sides. This means that changing a filter will make the files look like it was deleted on *both* sides and nothing will happen.
+
+However, the [`--exclude-if-present`][eifp] filter is **very dangerous** if the excluded file is added on one side only *after* files in the directory are in sync. It will cause rclone to skip the directory on one side and appear like it was deleted. 
+
+There *are* safe ways to use `--exclude-if-present`. For example, you can place exclude file in place on *both* sides before syncing. (Or placing it without adding the filter, syncing, and then adding the filter). Or, if the files have *never* been synced before (i.e. it's a new directory with the exclude file) then nothing bad will happen.
+
+Note that if `--exclude-if-present` is found in the `filter_flags`, a warning will be emitted.
+
+[eifp]:https://rclone.org/filtering/#exclude-directory-based-on-a-file
 
 ## Non-ModTime comparisons and conflicts
 

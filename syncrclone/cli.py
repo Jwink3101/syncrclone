@@ -106,7 +106,9 @@ class Config:
         if  self._config['compare'] != 'mtime' \
         and self._config['conflict_mode'] in {'older','newer','newer_tag'}:
             warnings.warn('When not comparing by mtime, older --> smaller, newer --> larger')
-        
+
+        if '--exclude-if-present' in self._config['filter_flags']:
+            warnings.warn("'--exclude-if-present' can cause issues. See readme")
         
     def __repr__(self):
         # Need to watch out for RCLONE_CONFIG_PASS in rclone_env
