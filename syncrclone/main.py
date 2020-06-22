@@ -364,6 +364,10 @@ class SyncRClone:
         curr = getattr(self,f'curr{AB}') # on remote -- DictTable
         prev = getattr(self,f'prev{AB}') # on remote -- DictTable
         
+        if not new or not curr or not prev:
+            debug('No need to move track')
+            return
+        
         delOther = getattr(self,f'del{BA}') # On OTHER side -- list
         moveOther = getattr(self,f'moves{BA}') # on OTHER side - list
 
