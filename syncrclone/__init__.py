@@ -1,4 +1,4 @@
-__version__ = '20200622.0.BETA'
+__version__ = '20200814.0.BETA'
 
 import time
 import io

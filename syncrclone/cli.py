@@ -4,6 +4,9 @@ import sys
 import os
 import random
 import warnings
+
+_showwarning = warnings.showwarning # store this
+
 import copy
 
 from . import debug,set_debug,get_debug,log,__version__
@@ -170,6 +173,7 @@ def cli(argv=None):
 
     if cliconfig.debug:
         set_debug(True)
+        warnings.showwarning = _showwarning # restore
     else:
         set_debug(False)
         warnings.showwarning = showwarning # Monkey patch warnings.showwarning for CLI usage

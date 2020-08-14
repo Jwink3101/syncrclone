@@ -80,21 +80,24 @@ class Rclone:
             stdout = subprocess.PIPE
             stderr = subprocess.STDOUT
             bufsize = 1
+            universal_newlines = True
         else:
             stdout = tempfile.NamedTemporaryFile(delete=False)
-            stderr=subprocess.PIPE
+            stderr = subprocess.PIPE
             bufsize = -1
+            universal_newlines = False
             
         proc = subprocess.Popen(cmd,
                                 stdout=stdout,
                                 stderr=stderr,
+                                universal_newlines=universal_newlines,
                                 env=env,bufsize=bufsize)
         
         if stream:
             out = []
             with proc.stdout:
-                for line in iter(proc.stdout.readline, b''):
-                    line = line.decode().rstrip()
+                for line in iter(proc.stdout.readline, ''):
+                    line = line.rstrip()
                     log('rclone:',line)
                     out.append(line)
             out = '\n'.join(out)
