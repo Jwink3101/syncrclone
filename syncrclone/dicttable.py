@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 from __future__ import unicode_literals
-#[git: list_dict_DB/] c458b61eca:dicttable.py (2020-05-26 21:13:01 -0600)
-
-__version__ = "20200526"
+# [git: list_dict_DB/] b2148b6023:dicttable.py (2020-08-25 10:30:26 -0600)
+__version__ = "20200825"
 __author__ = "Justin Winokur"
 
 import copy
@@ -509,7 +508,7 @@ class Query(object):
     """
     def __init__(self,DB):
         self._DB = DB
-        self._ixs = DB._ix.copy() # Everything
+        self._ixs = DB._ix # Everything. Do *NOT* copy but also never modify in place
         self._attr = None
         
         self._c = DB._c
@@ -548,10 +547,10 @@ class Query(object):
         
         # Account for '_index' attribute (May be deprecated in the future...)
         if self._attr == '_index':
-            self._ixs.intersection_update({value})
+            self._ixs = self._ixs.intersection({value}) # replace, don't update
             return self
         for val in _makelist(value):
-            self._ixs.intersection_update(self._DB._lookup[self._attr][val]) # Will return [] if _attr or val not there 
+             self._ixs = self._ixs.intersection(self._DB._lookup[self._attr][val]) # Will return [] if _attr or val not there . Replace, don't update
         return self
      
     def __ne__(self,value):
@@ -605,11 +604,11 @@ class Query(object):
     
     # Logic
     def __and__(self,Q2):
-        self._ixs.intersection_update(Q2._ixs)
+        self._ixs = self._ixs.intersection(Q2._ixs)
         return self
         
     def __or__(self,Q2):
-        self._ixs.update(Q2._ixs)
+        self._ixs = self._ixs.union(Q2._ixs)
         return self
         
     def __invert__(self):

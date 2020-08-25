@@ -230,7 +230,7 @@ class Rclone:
         
         # inodes if local
         if getattr(config,f'renames{AB}') == 'inode':
-            debug('{AB}: Getting local inodes')
+            debug(f'{AB}: Getting local inodes')
             if ':' in remote:
                 raise ConfigError('Cannot get inodes for non-local or named remote')
             for file in files:
