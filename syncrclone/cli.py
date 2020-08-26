@@ -80,8 +80,14 @@ class Config:
             self._config.pop(key,None)
         
         # Validate
-        if self._config['_syncrclone_version'] and False: # Not using yet but this is where we would validate input
-            raise ConfigError(f"Version '{self._config['_syncrclone_version']}' is too old. Update config")
+        
+        # versions. This can be changed in the future if things are broken
+        config_ver = self._config['_syncrclone_version'].split('.')
+        if config_ver != ['__VERSION__']:
+            config_ver = (int(config_ver[0]),int(config_ver[1])) + tuple(config_ver[2:])
+            if config_ver < (20200826,0):
+                warnings.warn('Previous behavior of conflict_mode changed. Please update your config')
+                #raise ConfigError(f"Version '{self._config['_syncrclone_version']}' is too old. Update config")
         
         for AB in 'AB':
             if  self._config[f'remote{AB}'] == "<<MUST SPECIFY>>":
@@ -90,7 +96,7 @@ class Config:
         reqs = [
             ('compare',('size','mtime','hash')),
             ('hash_fail_fallback',('size','mtime',None)),
-            ('conflict_mode',('A','B','older','newer','newer_tag','tag')),
+            ('conflict_mode',('A','B','older','newer','newer_tag','smaller','larger','tag')),
         ]
         for AB in 'AB':
             reqs.extend([
@@ -106,10 +112,6 @@ class Config:
         log(f"A: '{self.remoteA}'")
         log(f"B: '{self.remoteB}'")
         
-        if  self._config['compare'] != 'mtime' \
-        and self._config['conflict_mode'] in {'older','newer','newer_tag'}:
-            warnings.warn('When not comparing by mtime, older --> smaller, newer --> larger')
-
         if '--exclude-if-present' in self._config['filter_flags']:
             warnings.warn("'--exclude-if-present' can cause issues. See readme")
         

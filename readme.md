@@ -50,7 +50,7 @@ Initiate syncrclone: (see "Local and Remote Mode" below)
 
 Modify the config code. It is fully documented but also see [config tips](docs/config_tips.md). If you use your own rclone config file above, make sure to include 
 
-    rclone_env={'RCLONE_CONFIG': 'rclone.cfg'}
+    rclone_env = {'RCLONE_CONFIG': 'rclone.cfg'}
 
 or
     
@@ -122,9 +122,9 @@ Note that if `--exclude-if-present` is found in the `filter_flags`, a warning wi
 
 The default is to decide if files need to sync by comparing ModTime (or `mtime`). However, you can also compare by size (risky) or hash (robust).
 
-If you compare by size or hash, *even* if ModTime is available, older automatically means small and newer automatically means larger. This is because the ModTimes may be unreliable even if present (e.g. WebDAV)
+If you compare by size or hash, you can still resolve conflicts with modification time. Do note that not all remotes support ModTime and/or it may not be reliable. If using one of those types of remotes, do not use `newer`, `older`, or `newer_tag` conflict resolution. See [remote overview](https://rclone.org/overview/) for details.
 
-If your remote doesn't store hashes and must recalculate them (e.g. local, sftp), use `reuse_hashes(A/B)`. See the config file
+If your remote doesn't store hashes and must recalculate them (e.g. local, sftp), use `reuse_hashes(A/B)` if desired to only recalculate as needed. See the config file
 
 ## Differences from PyFiSync
 
@@ -142,6 +142,7 @@ Some additional docs:
 * [The algorithm](docs/algorithm.md)
 * [Miscellaneous details](docs/misc.md)
 * [Testing](docs/tests.md). Also includes how to test with other remotes.
+* [Changelog](docs/changelog.md)
 
 ## Alternatives
 

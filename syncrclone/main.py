@@ -33,7 +33,7 @@ class SyncRClone:
 
         # Get file lists
         log(f"Refreshing file list on A '{config.remoteA}'")
-        self.currA,self.prevA = self.rclone.file_list(remote='A')
+        self.currA,self.prevA = self.rclone.file_list(remote='A')   
         log(utils.file_summary(self.currA))
         
         log(f"Refreshing file list on B '{config.remoteB}'")
@@ -183,6 +183,7 @@ class SyncRClone:
 
         c = 0
         for path in commonPaths:
+
             q = {'Path':path}
             # We KNOW they exists for both
             fileA,fileB = self.currA[q],self.currB[q]
@@ -264,7 +265,7 @@ class SyncRClone:
             if compA and compB:
                 # This really shouldn't happen but if it does, just move on to
                 # conflict resolution
-                debug(f"'{path}': Both A and B compare to prev but do not agree. This is ODD.")
+                debug(f"'{path}': Both A and B compare to prev but do not agree. This is unexpected.")
             elif not compA and not compB:
                 # Do nothing but note it. Deal with conflict below
                 debug(f"'{path}': Neither compare. Both modified or both new")
@@ -279,26 +280,27 @@ class SyncRClone:
                 self.backupB.append(path)  
                 continue
             
-            # They conflict!
+            # They conflict! Handle it.
+            mA,mB = fileA.get('mtime',None),fileB.get('mtime',None)
+            sA,sB = fileA['Size'],fileB['Size']
+
+            txtA =  utils.unix2iso(mA) if mA else '<< not found >>' 
+            txtA += ' ({:0.2g} {:s})'.format(*utils.bytes2human(sA,short=True))
+            txtB =  utils.unix2iso(mB) if mB else '<< not found >>' 
+            txtB += ' ({:0.2g} {:s})'.format(*utils.bytes2human(sB,short=True))
+
+            if config.conflict_mode not in {'newer','older','newer_tag'}:
+                mA,mB = sA,sB # Reset m(AB) to s(AB)
             
-            mA,mB = None,None
-            if config.compare == 'mtime':
-                mA = fileA.get('mtime',None)
-                mB = fileB.get('mtime',None)
-                txtA = utils.unix2iso(mA)
-                txtB = utils.unix2iso(mB)
-                if not mA or not mB:
-                    warning.warn('No mtime found. Resorting to size')
-                        
             if not mA or not mB: # Either never set for non-mtime compare or no mtime listed
-                mA = fileA['Size']
-                mB = fileB['Size']
-                txtA = '{:0.2g} {:s}'.format(*utils.bytes2human(mA,short=False))
-                txtB = '{:0.2g} {:s}'.format(*utils.bytes2human(mB,short=False))
+                warning.warn('No mtime found. Resorting to size')
+                mA,mB = sA,sB # Reset m(AB) to s(AB)
+                
+            log(f"CONFLICT '{path}'")
+            log(f"    A: {txtA}")
+            log(f"    B: {txtB}")
             
-            txt = (f"CONFLICT '{path}'. "
-                   f"A: {txtA}, B: {txtB}. "
-                   f"Resolving with mode '{config.conflict_mode}' ")
+            txt = f"    Resolving with mode '{config.conflict_mode}'"
             
             if config.conflict_mode == 'A':
                 self.transA2B.append(path)
@@ -306,18 +308,19 @@ class SyncRClone:
             elif config.conflict_mode == 'B':
                 self.transB2A.append(path)
                 self.backupA.append(path)
-            elif config.conflict_mode == 'tag' \
-            or not mA \
-            or not mB \
-            or mA == mB:
+            elif config.conflict_mode == 'tag':
+                self.tagA.append(path) # Tags will *later* be added to transfer queue
+                self.tagB.append(path)
+            elif not mA or not mB or mA == mB:
+                txt = f"    Cannot resolve conflict with '{config.conflict_mode}'. Reverting to tagging both"
                 self.tagA.append(path) # Tags will *later* be added to transfer queue
                 self.tagB.append(path)
             elif mA > mB:
-                if config.conflict_mode == 'newer':
+                if config.conflict_mode in ('newer','larger'):
                     self.transA2B.append(path)
                     self.backupB.append(path)
                     txt += '(keep A)'
-                elif config.conflict_mode == 'older':
+                elif config.conflict_mode in ('older','smaller'):
                     self.transB2A.append(path)
                     self.backupA.append(path)
                     txt += '(keep B)'
@@ -325,12 +328,13 @@ class SyncRClone:
                     self.transA2B.append(path)
                     self.tagB.append(path)
                     txt += '(keep A)'
+                # else: won't happen since we validated conflict modes
             elif mA < mB:
-                if config.conflict_mode == 'newer':
+                if config.conflict_mode in ('newer','larger'):
                     self.transB2A.append(path)
                     self.backupA.append(path)
                     txt += '(keep B)'
-                elif config.conflict_mode == 'older':
+                elif config.conflict_mode in ('older','smaller'):
                     self.transA2B.append(path)
                     self.backupB.append(path)
                     txt += '(keep A)'
@@ -338,8 +342,10 @@ class SyncRClone:
                     self.transB2A.append(path)
                     self.tagA.append(path)
                     txt += '(keep B)'
+                # else: won't happen since we validated conflict modes
             else:
                 raise ValueError('Comparison Failed. Please report to developer') # Should not be here
+            
             log(txt)
                                 
     def track_moves(self,remote):

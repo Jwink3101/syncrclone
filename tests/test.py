@@ -382,7 +382,7 @@ def test_no_hashes():
     
     os.chdir(PWD0)
     
-@pytest.mark.parametrize("conflict_mode",('A','B','older','newer','newer_tag','tag'))
+@pytest.mark.parametrize("conflict_mode",('A','B','older','newer','newer_tag','smaller','larger','tag'))
 def test_conflict_resolution(conflict_mode):
     remoteA = 'A'
     remoteB = 'B'
@@ -398,7 +398,7 @@ def test_conflict_resolution(conflict_mode):
     test.setup()
 
     test.write_post('A/file.txt','A')
-    test.write_post('B/file.txt','B',add_dt=20)
+    test.write_post('B/file.txt','Bb',add_dt=20) # newer and larger
     
     print('-='*40);print('=-'*40)
     test.sync()
@@ -410,19 +410,20 @@ def test_conflict_resolution(conflict_mode):
     files = [os.path.relpath(f,'A/') for f in testutils.tree('A/')]
     
     A = exists('A/file.txt') and test.read('A/file.txt') == 'A'
-    B = exists('A/file.txt') and test.read('A/file.txt') == 'B'
+    B = exists('A/file.txt') and test.read('A/file.txt') == 'Bb'
     tA = any(file.endswith('.A') for file in files)
     tB = any(file.endswith('.B') for file in files)
     
-    if conflict_mode in ['A','older']:
+    if conflict_mode in ['A','older','smaller']:
         assert (A,B,tA,tB) == (True,False,False,False), f"{conflict_mode} {(A,B,tA,tB)}"
-    elif conflict_mode in ['B','newer']:
+    elif conflict_mode in ['B','newer','larger']:
         assert (A,B,tA,tB) == (False,True,False,False), f"{conflict_mode} {(A,B,tA,tB)}"
     elif conflict_mode in ['newer_tag']:
         assert (A,B,tA,tB) == (False,True,True,False), f"{conflict_mode} {(A,B,tA,tB)}"
     elif conflict_mode in ['tag']:
         assert (A,B,tA,tB) == (False,False,True,True), f"{conflict_mode} {(A,B,tA,tB)}"
-
+    else:
+        raise ValueError('Not studied') # Should not be here
     os.chdir(PWD0)
 
 
@@ -791,6 +792,41 @@ def test_and_demo_exclude_if_present():
             ('missing_inB', 'sub/onA')} == diffs
     
     assert "WARNING '--exclude-if-present' can cause issues. See readme" in stdout
+
+
+version_tests = ['20200826.0.BETA',None]
+@pytest.mark.parametrize("version",version_tests)
+def test_version_warning(version):
+    """
+    This is to test version warnings or even errors (eventually)
+    """
+    remoteA = 'A'
+    remoteB = 'B'
+    set_debug(False)
+
+    print(remoteA,remoteB)
+    test = testutils.Tester('ver',remoteA,remoteB)
+
+    ## Config
+    if version:
+        test.config._syncrclone_version = version
+    test.write_config()
+
+    # Setup
+    test.write_pre('A/file00.txt','0')
+    test.setup() # This has a sync that will throw the warnings
+    stdout = ''.join(test.synclogs[-1])
+    
+    if version and version.startswith('20200825.0'):
+        assert 'WARNING Previous behavior of conflict_mode changed. Please update your config' in stdout
+    else:
+        assert 'WARNING Previous behavior of conflict_mode changed. Please update your config' not in stdout
+    
+    # if different_version_match
+    
+    
+    os.chdir(PWD0)
+    
     
 if __name__ == '__main__':
     test_main('A','inode','cryptB:','mtime','mtime')
@@ -801,7 +837,7 @@ if __name__ == '__main__':
         test_move_attribs(attrib)
     test_reuse_hash()    
     test_no_hashes()
-    for conflict_mode in ('A','B','older','newer','newer_tag','tag'):
+    for conflict_mode in ('A','B','older','newer','newer_tag','smaller','larger','tag'):
         test_conflict_resolution(conflict_mode)
     test_backups(True)
     test_backups(False)
@@ -812,6 +848,8 @@ if __name__ == '__main__':
     test_local_mode()
     test_redacted_PW_and_modules_in_config_file()
     test_and_demo_exclude_if_present()
+    for version in version_tests:
+        test_version_warning(version)
 
     print('*'*80)
     print(' ALL PASSED')

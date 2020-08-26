@@ -81,17 +81,21 @@ compare = 'mtime'
 # When doing mtime comparisons, what is the error to allow
 dt = 2.5 # seconds
 
-# How to handle conflicts. Options are below but note that if using hash or 
-# size, older and newer mean smaller and larger which can cause incorrect 
-# syncing.
+# How to handle conflicts.
+# Note that even if comparison is done via hash, you can still resolve via
+# mod time. Be aware that not all remotes return reliable mod times and adjust
+# accordingly. See https://rclone.org/overview/
 #
-#   'A','B'         : Always select A or B
-#   'older','newer' : Select the respective file.
-#   'newer_tag`     : Select newer and tag the older
-#   'tag'           : Tag both
+#   'A','B'             : Always select A or B
+#   'tag'               : Tag both
+#
+#   'older','newer'     : Select the respective file. See note below.
+#   'newer_tag`         : Select newer and tag the older
+#
+#   'smaller','larger'  : Select the smaller or larger file
 #
 # A tag will append `.{time}.{A or B}` to the file
-# If a conflict cannot be resolved it will default to 'tag'.
+# If a conflict cannot be resolved it will default to 'tag' and print a warning.
 conflict_mode = 'newer'
 
 # Hashes can be expensive to compute on some remotes such as local or sftp.
