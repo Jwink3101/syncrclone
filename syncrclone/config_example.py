@@ -55,6 +55,16 @@ filter_flags = []
 # Remember that this config is evaluated from its parent directory.
 #
 # Example: ['--config','path/to/config']
+#
+# Note: Not all flags are compatible and may break the behavior of syncrclone
+#       such as ones changing the display (`--progress`, `--log-level`)
+#
+#       Also, some flags may be needed for certain remotes. See
+#           https://github.com/Jwink3101/syncrclone/issues/1
+#       for a discussion of needing `--drive-skip-gdocs` for gdrive
+#
+# There is extemely minimal validation of flags. If you're uncertain, have
+# a backup and test with `--dry-run`
 rclone_flags = []
 
 # The following are added to the existing environment. 

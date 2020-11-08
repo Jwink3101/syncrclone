@@ -13,7 +13,6 @@ from .cli import ConfigError
 from .dicttable import DictTable
 from . import utils
 
-
 FILTER_FLAGS = {'--include', '--exclude', '--include-from', '--exclude-from', 
                 '--filter', '--filter-from','--files-from'}
 
@@ -335,14 +334,9 @@ class Rclone:
                         cmd[0] = 'moveto' # non-backup deletes are in the original conditional
                     else:
                         cmd[0] = 'copyto' # Keep the original on delete
-                    log(t)
+#                     log(t)
                     self.call(cmd + [src,dest],stream=True)
-                    
-                    
-        if action in ['delete','backup']:
-            log(f"Backups for {AB} stored in '{self.backup_path[AB]}'")
     
-
     def transfer(self,mode,files):
         config = self.config
         if mode == 'A2B':
@@ -413,6 +407,7 @@ class Rclone:
     
         cmd += ['--no-check-dest','--ignore-times','--no-traverse']
 
+        log('')
         if not breaklock:
             log(f'Setting lock on {AB}')
             cmd[0] = 'copyto'

@@ -2,6 +2,12 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20201107.0.BETA
+
+* Adds documentation about additional flags and how they can break syncrclone
+    * References and closes #1 which also has more info on some grive flags
+* Updates logging to (a) put identified actions in one place and (b) add spacing to make parsing easier
+
 ## 20200826.0.BETA
 
 * Now allows for time-based conflict resolution even when not comparing by time. Note that this now puts the onus on the *user* to make sure the remote supports ModTime

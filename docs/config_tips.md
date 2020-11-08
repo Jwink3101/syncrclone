@@ -144,13 +144,42 @@ These are some suggestions of things to exclude.
     .Trashes/**
 
 
+### Git Filters
 
+There are much better solutions for syncing files along with git repos such as git-annex or git-lfs. However, syncrclone can be used to sync anything *not* tracked in git. This assumes that the "A" remote is local and it is set up in local-mode (though it can be modified otherwise).
 
+```python
+remoteA = "../" # set automatically
 
+# ...
+# Set up all of your main filters FIRST!
+filter_flags = [] #
 
+import subprocess
+topdir = subprocess.check_output(['git','rev-parse','--show-toplevel'])
+topdir = topdir.decode().strip()
 
+with open('git-files.txt','wt') as file:
+    subprocess.call(['git','ls-files'],cwd=topdir,stdout=file)
 
+filter_flags.extend(['--exclue-from','.syncrclone/git-files.txt'])
+```
 
+Now, all files that are tracked in git will *not* be synced but all others will be. 
+
+**NOTE**: This method has some very real issues and should be used carefully. For example, it is best if the git repos are up to date with each other before calling syncrclone on any of them! And be careful about un-tracking a file as syncrclone could think it is a deletion.
+
+## rclone flags
+
+You can set flags for rclone to use in all functions calls. Examples that may be useful are flags such as `--transfers` to control the number of files transfered at a time. Or `--config` to set a config path, etc.
+
+However, some flags may break syncrclone, especially ones that modify the output behavior. See [Issue #1][1] for an example of how `--progress` may break syncrclone.
+
+Also, some flags may be needed if the two remotes "see" different files. For example, as also noted in [#1][1], `--drive-skip-gdocs` may be needed on Google Drive since Google Drive can translate to and from docx and Google Docs.
+
+Using `--dry-run` should illuminate any issues but if you're uncertain, make a backup before messing with flags.
+
+[1]:https://github.com/Jwink3101/syncrclone/issues/1
 
 
 

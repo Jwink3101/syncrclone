@@ -32,6 +32,7 @@ class SyncRClone:
             return
 
         # Get file lists
+        log('')
         log(f"Refreshing file list on A '{config.remoteA}'")
         self.currA,self.prevA = self.rclone.file_list(remote='A')   
         log(utils.file_summary(self.currA))
@@ -69,29 +70,37 @@ class SyncRClone:
         self.echo_queues('After processing new and tags')
         
         if config.dry_run:
-            self.dry_run()
+            self.summarize(dry=True)
             self.dump_logs()
             return
         
         # Perform deletes, backups, and moves
+        self.summarize(dry=False)
+        
+        log('');log('Performing Actions on A')
         self.rclone.delete_backup_move('A',self.delA,'delete')
         if config.backup: self.rclone.delete_backup_move('A',self.backupA,'backup')
         self.rclone.delete_backup_move('A',self.movesA,'move')
+        log(f"""Backups for A stored in '{self.rclone.backup_path["A"]}'""")
         
+        log('');log('Performing Actions on A')
         self.rclone.delete_backup_move('B',self.delB,'delete')
         if config.backup: self.rclone.delete_backup_move('B',self.backupB,'backup')
         self.rclone.delete_backup_move('B',self.movesB,'move')
+        log(f"""Backups for B stored in '{self.rclone.backup_path["B"]}'""")
+        
         
         # Perform final transfers
         sumA = utils.file_summary([self.currA.query_one(Path=f) for f in self.transA2B])
-        log(f'A >>> B {sumA}')
+        log('');log(f'A >>> B {sumA}')
         self.rclone.transfer('A2B',self.transA2B)
         
         sumB = utils.file_summary([self.currB.query_one(Path=f) for f in self.transB2A])
-        log(f'B >>> A {sumB}')
+        log('');log(f'B >>> A {sumB}')
         self.rclone.transfer('B2A',self.transB2A)
 
         # Update lists if needed
+        log('')
         if self.delA or self.backupA or self.movesA or self.transB2A:
             log('Refreshing file list on A')
             new_listA,_ = self.rclone.file_list(remote='A',prev_list=self.currA0)
@@ -143,15 +152,27 @@ class SyncRClone:
             self.rclone.copylog('A',tfile,os.path.join(self.config.log_dest,logname))
             self.rclone.copylog('B',tfile,os.path.join(self.config.log_dest,logname))
                 
-    def dry_run(self):
-        log('(DRY RUN)')
+    def summarize(self,dry=False):
+        if dry:
+            tt = '(DRY RUN) '
+            log(tt.strip())
+        else:
+            tt = ''
+        
+        attr_names = {'del':'delete (with{} backup)'.format('out' if not self.config.backup else ''),
+                      'backup':'Backup'}
+            
         for AB in 'AB':
+            log('')
+            log(f"Actions queued on {AB}")
             for attr in ['del','backup','moves']:
                 for file in getattr(self,f'{attr}{AB}'):
                     if attr == 'moves':
-                        log(f"(DRY RUN) on {AB}: move '{file[0]}' --> '{file[1]}'")
+                        log(f"{tt}Move on {AB}: '{file[0]}' --> '{file[1]}'")
                     else:
-                        log(f"(DRY RUN) on {AB}: {attr} '{file}'")
+                        log(f"{tt}{attr_names.get(attr,attr)} on AB: '{file}'")
+        if not dry:
+            return
         sumA = utils.file_summary([self.currA.query_one(Path=f) for f in self.transA2B])
         log(f'(DRY RUN) A >>> B {sumA}')
         sumB = utils.file_summary([self.currB.query_one(Path=f) for f in self.transB2A])
@@ -227,6 +248,7 @@ class SyncRClone:
         # * Backup -- Always assign but don't perform if --no-backup
         # * Move (including tag)
         # * Transfer
+        log('')
         for path in allPaths:
             fileA = self.currA[{'Path':path}]
             fileB = self.currB[{'Path':path}]
@@ -381,7 +403,7 @@ class SyncRClone:
             try:
                 # Note that this will not add it to all files but it isn't
                 # getting saved
-                utils.add_hash_compare_attribute(curr,prev)
+                utils.add_hash_compare_attribute(curr,prev) # adds 'common_hash'
             except ValueError:
                 log(f'WARNING: Could not track moves on {AB} due to missing hashes')
                 return
@@ -393,15 +415,18 @@ class SyncRClone:
             debug(f"Looking for moves on {AB}: '{path}'")
             currfile = curr[{'Path':path}]
             
+            # Build a query for previous files that always includes size and 
+            # optionally hash or inode. Then find all previous files based on 
+            # that. If mtime (or inode with implies mtime), check with tolerance 
+            
+            query = {'Size':currfile['Size']}
             if rename_attrib == 'hash':
-                query = {'common_hash':currfile.get('common_hash',None)}
-            else: # All the rest
-                query = {'Size':currfile['Size']}
-                if rename_attrib == 'inode':
-                    query['inode'] = currfile['inode']
+                query['common_hash'] = currfile.get('common_hash',None)
+            elif rename_attrib == 'inode':
+                query['inode'] = currfile['inode']
             prevfiles = list(prev.query(query))
             
-            if rename_attrib in ['mtime','inode']: # comapre with tol
+            if rename_attrib in ['mtime','inode']: # compare with tol. inode also checks mtime
                 prevfiles = [f for f in prevfiles if abs(f['mtime'] - currfile['mtime']) < config.dt]
             
             if not prevfiles:
@@ -467,7 +492,6 @@ class SyncRClone:
                 msg.append(f'  {lock}')
             raise LockedRemoteError('\n'.join(msg))
             
-    
     def compare(self,file1,file2):
         """Compare file1 and file2 (may be A or B or curr and prev)"""
         config = self.config
@@ -477,7 +501,6 @@ class SyncRClone:
             return False
         if not file2:
             return False
-        
     
         if compare == 'hash':
             h1 = file1.get('Hashes',{})

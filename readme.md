@@ -138,7 +138,7 @@ syncrclone was designed exclusively for rclone which means that I didn't have to
 
 Some additional docs:
 
-* [Configuration tips](docs/config_tips.md)
+* [Configuration tips](docs/config_tips.md), including setting rclone flags
 * [The algorithm](docs/algorithm.md)
 * [Miscellaneous details](docs/misc.md)
 * [Testing](docs/tests.md). Also includes how to test with other remotes.

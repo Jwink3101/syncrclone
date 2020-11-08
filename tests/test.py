@@ -190,11 +190,11 @@ def test_main(remoteA,renamesA,remoteB,renamesB,compare):
     # Moves w/o edit
     assert not exists('A/MoveOnB.txt')
     assert exists('A/sub2/MoveOnB.txt')
-    assert "move A: 'MoveOnB.txt' --> 'sub2/MoveOnB.txt'" in stdout
+    assert "Move on A: 'MoveOnB.txt' --> 'sub2/MoveOnB.txt'" in stdout
 
     assert not exists('A/MoveOnA.txt')
     assert exists('A/sub/MovedOnA.txt')
-    assert "move B: 'MoveOnA.txt' --> 'sub/MovedOnA.txt'" in stdout
+    assert "Move on B: 'MoveOnA.txt' --> 'sub/MovedOnA.txt'" in stdout
     
     assert not exists('A/MoveOnAB.txt')
     assert exists('A/MovedOnAB.txt')
@@ -320,11 +320,11 @@ def test_move_attribs(attrib):
         notmoved = ''    
 
     for c in moved:
-        assert f"move B: 'file{c}.txt' --> 'file{c}_moved.txt'" in stdout,f"{attrib} file{c} didn't move"
+        assert f"Move on B: 'file{c}.txt' --> 'file{c}_moved.txt'" in stdout,f"{attrib} file{c} didn't move"
     for c in too_many:
         assert f"Too many possible previous files for 'file{c}_moved.txt' on A" in stdout, f"{attrib} file{c} failed multiple"
     for c in notmoved:
-        assert f"move B: 'file{c}.txt' --> 'file{c}_moved.txt'" not in stdout,f"{attrib} file{c} moved"
+        assert f"Move on B: 'file{c}.txt' --> 'file{c}_moved.txt'" not in stdout,f"{attrib} file{c} moved"
 
     os.chdir(PWD0)
 
@@ -829,6 +829,7 @@ def test_version_warning(version):
     
     
 if __name__ == '__main__':
+#     test_main('A','hash','B','hash','mtime') # Vanilla test covered below
     test_main('A','inode','cryptB:','mtime','mtime')
     test_main('cryptA:','size','cryptB:','mtime','mtime')
     for remoteA,renamesA,remoteB,renamesB,compare in MAIN_TESTS:
