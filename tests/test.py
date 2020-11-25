@@ -53,7 +53,7 @@ MAIN_TESTS.extend(get_MAIN_TESTS())
     
 
 @pytest.mark.parametrize("remoteA,renamesA,remoteB,renamesB,compare",MAIN_TESTS)
-def test_main(remoteA,renamesA,remoteB,renamesB,compare):
+def test_main(remoteA,renamesA,remoteB,renamesB,compare,interactive=False):
     """
     Main test with default settings (if the defaults change, this will need to
     be updated. A few minor changes from the defaults are also made
@@ -167,7 +167,8 @@ def test_main(remoteA,renamesA,remoteB,renamesB,compare):
     
     print('-='*40)
     print('=-'*40)
-    obj = test.sync([])
+    args = ['--interactive'] if interactive else []
+    obj = test.sync(args)
     
     ## Confirm!
     print('-'*100)
@@ -829,7 +830,8 @@ def test_version_warning(version):
     
     
 if __name__ == '__main__':
-#     test_main('A','hash','B','hash','mtime') # Vanilla test covered below
+    test_main('A','hash','B','hash','mtime') # Vanilla test covered below
+
     test_main('A','inode','cryptB:','mtime','mtime')
     test_main('cryptA:','size','cryptB:','mtime','mtime')
     for remoteA,renamesA,remoteB,renamesB,compare in MAIN_TESTS:
@@ -851,6 +853,13 @@ if __name__ == '__main__':
     test_and_demo_exclude_if_present()
     for version in version_tests:
         test_version_warning(version)
+
+
+    # hacked together parser. This is used to manually test whether the interactive
+    # mode is working
+    if len(sys.argv) > 1 and sys.argv[1] == '-i':
+        test_main('A','hash','B','hash','mtime',interactive=True)
+
 
     print('*'*80)
     print(' ALL PASSED')

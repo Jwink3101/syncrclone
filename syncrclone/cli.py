@@ -158,12 +158,15 @@ def cli(argv=None):
         help=('Specify the path to the config file for this sync job. '
               'If `--new`, will be the path to write a new template. '
               "If specified as a directory, will search upwards for "
-              "'.syncrclone/config.py'. "))
+              "'.syncrclone/config.py' or create it here if `--new`."))
     
     parser.add_argument('--break-lock',choices=['both','A','B'],
         help="Break locks on either A, B or both remotes")
     parser.add_argument('--debug',action='store_true',help='Debug messages will be printed')
-    parser.add_argument('--dry-run',action='store_true',help='Run in dry-run mode and do not change anything')
+    parser.add_argument('--dry-run',action='store_true',
+        help='Run in dry-run mode and do not change anything. See also --interactive')
+    parser.add_argument('-i','--interactive',action='store_true',
+        help='Similar to --dry-run except it will show planned actions and prompt as to whether or not to proceed')
     parser.add_argument('--new',action='store_true',help='Path to save a new config file')
     parser.add_argument('--no-backup',action='store_false',dest='backup',help='Do not do any backups on this run')
     parser.add_argument('--version', action='version', version='syncrclone-' + __version__)
@@ -172,7 +175,7 @@ def cli(argv=None):
         argv = sys.argv[1:]
     
     cliconfig = parser.parse_args(argv)
-
+    
     if cliconfig.debug:
         set_debug(True)
         warnings.showwarning = _showwarning # restore
@@ -184,6 +187,9 @@ def cli(argv=None):
     debug('CLI config:',cliconfig)
     
     try:
+        if cliconfig.interactive and cliconfig.dry_run:
+            raise ValueError('Cannot set `--dry-run` AND `--interactive`')
+        
         # Decide if local mode or remote mode.
         localmode = os.path.isdir(cliconfig.configpath)
         debug(f'Localmode: {localmode}')
@@ -218,7 +224,7 @@ def cli(argv=None):
     except Exception as E:
         if get_debug():
             raise
-        log('ERROR: ' + type(E).__name__,file=sys.stderr)
+        #log('ERROR: ' + type(E).__name__,file=sys.stderr)
         log('ERROR: ' + str(E),file=sys.stderr)
         sys.exit(1)
 

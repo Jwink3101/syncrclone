@@ -2,6 +2,13 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20201125.0.BETA
+
+(minor)
+
+* Adds `--interactive` mode which prompts you if you want to continue. Saves having to first call `--dry-run` and then call again
+* Fixes some of the logging updates in the last version. Very minor
+
 ## 20201107.0.BETA
 
 * Adds documentation about additional flags and how they can break syncrclone

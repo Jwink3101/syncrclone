@@ -75,17 +75,27 @@ class SyncRClone:
             return
         
         # Perform deletes, backups, and moves
-        self.summarize(dry=False)
+        if config.interactive:
+            self.summarize(dry=None) 
+            # I may add a timeout in the future but the  easiest method, 
+            # select.select, will preclude (eventual?) windows support
+            cont = input('Would you like to continue? Y/[N]: ')
+            if not cont.lower().startswith('y'):
+                sys.exit()
+        else:
+            self.summarize(dry=False)  
         
         log('');log('Performing Actions on A')
         self.rclone.delete_backup_move('A',self.delA,'delete')
-        if config.backup: self.rclone.delete_backup_move('A',self.backupA,'backup')
+        if config.backup: 
+            self.rclone.delete_backup_move('A',self.backupA,'backup')
         self.rclone.delete_backup_move('A',self.movesA,'move')
         log(f"""Backups for A stored in '{self.rclone.backup_path["A"]}'""")
         
-        log('');log('Performing Actions on A')
+        log('');log('Performing Actions on B')
         self.rclone.delete_backup_move('B',self.delB,'delete')
-        if config.backup: self.rclone.delete_backup_move('B',self.backupB,'backup')
+        if config.backup: 
+            self.rclone.delete_backup_move('B',self.backupB,'backup')
         self.rclone.delete_backup_move('B',self.movesB,'move')
         log(f"""Backups for B stored in '{self.rclone.backup_path["B"]}'""")
         
@@ -153,34 +163,43 @@ class SyncRClone:
             self.rclone.copylog('B',tfile,os.path.join(self.config.log_dest,logname))
                 
     def summarize(self,dry=False):
-        if dry:
+        """
+        dry can be True, False, or None where None is to show the planned
+        """
+        if dry is True:
             tt = '(DRY RUN) '
             log(tt.strip())
-        else:
+        elif dry is False:
             tt = ''
+        elif dry is None:
+            tt = '(PLANNED) '
+        else:
+            raise ValueError() # Just in case I screw up later
         
         attr_names = {'del':'delete (with{} backup)'.format('out' if not self.config.backup else ''),
                       'backup':'Backup'}
             
         for AB in 'AB':
             log('')
-            log(f"Actions queued on {AB}")
+            log(f"Actions queued on {AB}:")
             for attr in ['del','backup','moves']:
                 for file in getattr(self,f'{attr}{AB}'):
                     if attr == 'moves':
                         log(f"{tt}Move on {AB}: '{file[0]}' --> '{file[1]}'")
                     else:
-                        log(f"{tt}{attr_names.get(attr,attr)} on AB: '{file}'")
-        if not dry:
+                        log(f"{tt}{attr_names.get(attr,attr)} on {AB}: '{file}'")
+        if dry is False:
             return
+        
         sumA = utils.file_summary([self.currA.query_one(Path=f) for f in self.transA2B])
-        log(f'(DRY RUN) A >>> B {sumA}')
         sumB = utils.file_summary([self.currB.query_one(Path=f) for f in self.transB2A])
+        
+        log('');log(f'{tt}A >>> B {sumA}')
         for file in self.transA2B:
-            log(f"(DRY RUN) Transfer A >>> B: '{file}'")
-        log(f'(DRY RUN) B >>> A {sumB}')
+            log(f"{tt}Transfer A >>> B: '{file}'")
+        log('');log(f'{tt}B >>> A {sumB}')
         for file in self.transB2A:
-            log(f"(DRY RUN) Transfer B >>> A: '{file}'")
+            log(f"{tt}Transfer B >>> A: '{file}'")
             
     def echo_queues(self,descr=''):
         debug(f'Printing Queueus {descr}')
