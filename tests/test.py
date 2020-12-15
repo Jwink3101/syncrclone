@@ -428,7 +428,7 @@ def test_conflict_resolution(conflict_mode):
     os.chdir(PWD0)
 
 
-@pytest.mark.parametrize("backup",(True,False))
+@pytest.mark.parametrize("backup",(True,False,None))
 def test_backups(backup):
     remoteA = 'A'
     remoteB = 'B'
@@ -443,7 +443,7 @@ def test_backups(backup):
     
     test.write_pre('A/ModifiedOnB.txt','B')
     test.write_pre('A/DeletedOnB.txt','B')
-
+    
     test.setup()
     
     os.remove('A/DeletedOnA.txt')
@@ -453,6 +453,10 @@ def test_backups(backup):
     
     print('-='*40);print('=-'*40)
     if backup:
+        test.sync()
+    elif backup is None: # Same as False but set it in the configs
+        test.config.backup = False
+        test.write_config()
         test.sync()
     else:
         test.sync(['--no-backup'])
@@ -477,7 +481,7 @@ def test_backups(backup):
         # The A files were modified so these should all read A
         assert all(test.read(f) == 'A' for f in backedB) # not A1
         assert all(file.endswith('A.txt') for file in backedB)
-    else:
+    else: # False and None
         assert len(backedA) == len(backedB) == len(backedB) == len(backedB) == 0
         
     os.chdir(PWD0)
@@ -830,8 +834,8 @@ def test_version_warning(version):
     
     
 if __name__ == '__main__':
-    test_main('A','hash','B','hash','mtime') # Vanilla test covered below
-
+#     test_main('A','hash','B','hash','mtime') # Vanilla test covered below
+    
     test_main('A','inode','cryptB:','mtime','mtime')
     test_main('cryptA:','size','cryptB:','mtime','mtime')
     for remoteA,renamesA,remoteB,renamesB,compare in MAIN_TESTS:
@@ -844,6 +848,7 @@ if __name__ == '__main__':
         test_conflict_resolution(conflict_mode)
     test_backups(True)
     test_backups(False)
+    test_backups(None) # set in config
     test_dry_run()
     test_logs()
     test_three_way()
@@ -853,7 +858,6 @@ if __name__ == '__main__':
     test_and_demo_exclude_if_present()
     for version in version_tests:
         test_version_warning(version)
-
 
     # hacked together parser. This is used to manually test whether the interactive
     # mode is working

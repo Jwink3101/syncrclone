@@ -168,7 +168,7 @@ def cli(argv=None):
     parser.add_argument('-i','--interactive',action='store_true',
         help='Similar to --dry-run except it will show planned actions and prompt as to whether or not to proceed')
     parser.add_argument('--new',action='store_true',help='Path to save a new config file')
-    parser.add_argument('--no-backup',action='store_false',dest='backup',help='Do not do any backups on this run')
+    parser.add_argument('--no-backup',action='store_true',help='Do not do any backups on this run')
     parser.add_argument('--version', action='version', version='syncrclone-' + __version__)
 
     if argv is None:
@@ -214,9 +214,13 @@ def cli(argv=None):
     
         config.parse() # NOTE: This now changes where the entire program is executed to the path of that file!
         
+        noback = cliconfig.no_backup; del cliconfig.no_backup # == to pop
+        if noback:
+            config.backup = False # Override setting
+        
         for key,val in vars(cliconfig).items():
             setattr(config,key,val)
-  
+        
         debug('config:',config)
         r = SyncRClone(config,break_lock=config.break_lock)
         if _RETURN:

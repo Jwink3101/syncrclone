@@ -17,7 +17,7 @@ setup(
         'console_scripts': ['syncrclone=syncrclone.cli:cli'],
     },
     version=syncrclone.__version__,
-    description='Python-based bi-direction sync tool for rclone',
+    description='Python-based bi-directional sync tool for rclone',
     url='https://github.com/Jwink3101/syncrclone',
     author="Justin Winokur",
     author_email='Jwink3101@@users.noreply.github.com',

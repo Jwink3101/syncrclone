@@ -2,6 +2,11 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20201215.0.BETA
+
+* Fixes and closes #2 where using `backup=False` in the config will not be respected. Adds to the backup tests to ensure this is the case
+* (minor) Do not log backups if there weren't any
+
 ## 20201125.0.BETA
 
 (minor)

@@ -90,14 +90,16 @@ class SyncRClone:
         if config.backup: 
             self.rclone.delete_backup_move('A',self.backupA,'backup')
         self.rclone.delete_backup_move('A',self.movesA,'move')
-        log(f"""Backups for A stored in '{self.rclone.backup_path["A"]}'""")
+        if config.backup and (self.delA or self.backupA):
+            log(f"""Backups for A stored in '{self.rclone.backup_path["A"]}'""")
         
         log('');log('Performing Actions on B')
         self.rclone.delete_backup_move('B',self.delB,'delete')
         if config.backup: 
             self.rclone.delete_backup_move('B',self.backupB,'backup')
         self.rclone.delete_backup_move('B',self.movesB,'move')
-        log(f"""Backups for B stored in '{self.rclone.backup_path["B"]}'""")
+        if config.backup and (self.delB or self.backupB):
+            log(f"""Backups for B stored in '{self.rclone.backup_path["B"]}'""")
         
         
         # Perform final transfers
