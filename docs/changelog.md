@@ -2,6 +2,10 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20210121.0.BETA
+
+* Changed the format for storing the previous lists from using `lzma` so that they can be read and extracted with `xz`. This will support (and test) reading the prior format so that it can pull either but only create the new xz format. That support may *eventually* be removed but there is no clear timeline. Note that the `zipjson` list will stick around but won't be used anymore
+
 ## 20201215.0.BETA
 
 * Fixes and closes #2 where using `backup=False` in the config will not be respected. Adds to the backup tests to ensure this is the case

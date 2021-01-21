@@ -3,9 +3,9 @@ Most of the rclone interfacing
 """
 import json
 import os
-import zlib
 from collections import deque
 import subprocess
+import lzma
 import tempfile
 
 from . import debug,log
@@ -16,7 +16,6 @@ from . import utils
 FILTER_FLAGS = {'--include', '--exclude', '--include-from', '--exclude-from', 
                 '--filter', '--filter-from','--files-from'}
 
-HEADER = b'zipjson\x00\x00' # Common header for file lists. If this changes, change docs
 
 def mkdir(path,isdir=True):
     if not isdir:
@@ -123,13 +122,13 @@ class Rclone:
         AB = remote
         remote = {'A':config.remoteA,'B':config.remoteB}[remote]
         
-        dst = os.path.join(remote,'.syncrclone',f'{AB}-{self.config.name}_fl.zipjson')
+        dst = os.path.join(remote,'.syncrclone',f'{AB}-{self.config.name}_fl.json.xz')
         src = os.path.join(self.tmpdir,f'{AB}_curr')
         mkdir(src,isdir=False)
         
         filelist = list(filelist)
-        with open(src,'wb') as file:
-            file.write(HEADER + zlib.compress(json.dumps(filelist,ensure_ascii=False).encode('utf8')))
+        with lzma.open(src,'wt') as file:
+            json.dump(filelist,file,ensure_ascii=False)
         
         cmd = config.rclone_flags \
             + self.add_args \
@@ -139,6 +138,26 @@ class Rclone:
         self.call(cmd)
 
     def pull_prev_list(self,*,remote=None):
+        config = self.config
+        AB = remote
+        remote = {'A':config.remoteA,'B':config.remoteB}[remote]
+        
+        src = os.path.join(remote,'.syncrclone',f'{AB}-{self.config.name}_fl.json.xz')
+        dst = os.path.join(self.tmpdir,f'{AB}_prev')
+        mkdir(dst,isdir=False)
+        
+        cmd = config.rclone_flags \
+            + self.add_args \
+            + getattr(config,f'rclone_flags{AB}') \
+            +  ['copyto',src,dst]
+        self.call(cmd)
+        
+        with lzma.open(dst) as file:
+            return json.load(file)
+
+    def pull_prev_listLEGACY(self,*,remote=None):
+        import zlib
+        HEADER = b'zipjson\x00\x00' 
         config = self.config
         AB = remote
         remote = {'A':config.remoteA,'B':config.remoteB}[remote]
@@ -156,7 +175,7 @@ class Rclone:
         with open(dst,'rb') as file:
             file.seek(len(HEADER)) # Skip
             return json.loads(zlib.decompress(file.read()))
-        
+
     def file_list(self,*,prev_list=None,remote=None):
         """
         Get both current and previous file lists. If prev_list is
@@ -184,9 +203,11 @@ class Rclone:
         
         # build the command including initial filters *before* any filters set
         # by the user
-        prev_list_name = os.path.join('.syncrclone',f'{AB}-{self.config.name}_fl.zipjson')
+        prev_list_name = os.path.join('.syncrclone',f'{AB}-{self.config.name}_fl.json.xz')
+        prev_list_nameLEGACY = os.path.join('.syncrclone',f'{AB}-{self.config.name}_fl.zipjson')
         cmd = ['lsjson',
                '--filter',f'+ /{prev_list_name}', # All of syncrclone's filters come first and include before exclude
+               '--filter',f'+ /{prev_list_nameLEGACY}', 
                '--filter','+ /.syncrclone/LOCK/*',
                '--filter','- /.syncrclone/**']
         
@@ -220,6 +241,13 @@ class Rclone:
             debug(f'Pulling prev list on {AB}')
             prev_list = self.pull_prev_list(remote=AB)
             files.remove({'Path':prev_list_name})
+            if {'Path':prev_list_nameLEGACY} in files:
+                log(f'NOTE: legacy previous list "{prev_list_nameLEGACY}" was found but NOT use on {AB}. You should remove it')
+        elif not prev_list and {'Path':prev_list_nameLEGACY} in files:
+            debug(f'Pulling prev list LEGACY on {AB}')
+            prev_list = self.pull_prev_listLEGACY(remote=AB)
+            files.remove({'Path':prev_list_nameLEGACY})
+            log(f'NOTE: legacy previous list "{prev_list_nameLEGACY}" was used on {AB}. You can now remove it')
         elif not prev_list:
             debug(f'NEW prev list on {AB}')
             prev_list = []

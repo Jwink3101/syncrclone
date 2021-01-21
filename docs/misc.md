@@ -4,7 +4,21 @@ Little bits of information about how syncrclone works.
 
 ## Reading (and modifying) file lists
 
-Each remote stores a copy of their respective past file lists in `.syncrclone/{AB}-{name}_fl.zipjson`. This is used to detect new vs deleted, prevent deleting modified files, and is also used to speed up hashing by reusing them when possible.
+Each remote stores a copy of their respective past file lists in `.syncrclone/{AB}-{name}_fl.json.xz`. This is used to detect new vs deleted, prevent deleting modified files, and is also used to speed up hashing by reusing them when possible.
+
+The `xz` format is read and written with the `lzma` module in python. It can also be read or written outside python using the `xz` tool
+
+To convert *from* `.json.xz` to `.json` use:
+
+    $ xz -d --keep A-name_fl.json.xz
+
+Where `--keep` is optional but keeps the original file around. To convert back to `.json.xz`, it is as simple as:
+
+    $ xz A-name_fl.json
+
+### Legacy
+
+Pre 20210121.0, file lists were stored as a zlib-compressed json string.
 
 The files are UTF8 encoded JSON that is then zlib compressed and given as header `b'zipjson\x00\x00'`. The following python snippet will let you read this into a list and then back out.
 
@@ -19,14 +33,12 @@ with open('A-name_fl.zipjson','rb') as file:
     files = json.loads(zlib.decompress(file.read()))
 ```
  
-If you modify this, make sure it is the right format with the right headings, etc. (reasons for doing this would be to patch in hashes computed elsewhere. Do it with caution!)
+To write out to the new format, use the following simple snippet
 
 ```python
-import json,zlib
-HEADER = b'zipjson\x00\x00'
-
-with open('A-name_fl.zipjson','wb') as file:
-    file.write(HEADER + zlib.compress(json.dumps(files,ensure_ascii=False).encode('utf8')))
+import json,lzma
+with lzma.open('A-name_fl.json.xz','wt') as file:
+    json.dump(files,file,ensure_ascii=False)
 ```
 
 ## Locks

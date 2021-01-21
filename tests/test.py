@@ -7,6 +7,7 @@ import shutil
 import glob
 import time
 import warnings
+import zlib,lzma,json
 
 import testutils
 
@@ -828,13 +829,55 @@ def test_version_warning(version):
         assert 'WARNING Previous behavior of conflict_mode changed. Please update your config' not in stdout
     
     # if different_version_match
-    
-    
     os.chdir(PWD0)
+
+@pytest.mark.parametrize("legA,legB",((0,1),(1,0),(1,1)))
+def test_legacy_filelist(legA,legB):
+    remoteA = 'A'
+    remoteB = 'B'
+    set_debug(False)   
     
+    test = testutils.Tester('legacy_list',remoteA,remoteB)   
+    test.config.name = 'legacytest'
+    test.write_config()
     
+    test.write_pre('A/fileADEL.txt','ADEL')
+    test.write_pre('A/fileSTAY.txt','STAY')
+    test.write_pre('A/fileBDEL.txt','BDEL')
+    
+    test.setup()
+    
+    os.remove('A/fileADEL.txt') # If we do not have the previous list, then it will copy back!
+    os.remove('B/fileBDEL.txt') # If we do not have the previous list, then it will copy back!
+    
+    # Convert the lists
+    def xz2zipjson(xz,zj):
+        HEADER = b'zipjson\x00\x00' 
+        with lzma.open(xz) as file:
+            files = json.load(file)
+        with open(zj,'wb') as file:
+            file.write(HEADER + zlib.compress(json.dumps(files,ensure_ascii=False).encode('utf8')))
+        os.unlink(xz)
+    
+    if legA:
+        xz2zipjson('A/.syncrclone/A-legacytest_fl.json.xz','A/.syncrclone/A-legacytest_fl.zipjson')
+    if legB:
+        xz2zipjson('B/.syncrclone/B-legacytest_fl.json.xz','B/.syncrclone/B-legacytest_fl.zipjson')    
+    
+    print('-='*40);print('=-'*40)
+    test.sync()
+    
+    # Compare
+    diffs = test.compare_tree()
+    assert not diffs
+    assert not exists('A/fileADEL.txt')
+    assert not exists('B/fileBDEL.txt')
+    
+    #test.sync() # Just to see if the log changed in manual testing
+    os.chdir(PWD0)
+
 if __name__ == '__main__':
-#     test_main('A','hash','B','hash','mtime') # Vanilla test covered below
+    test_main('A','hash','B','hash','mtime') # Vanilla test covered below
     
     test_main('A','inode','cryptB:','mtime','mtime')
     test_main('cryptA:','size','cryptB:','mtime','mtime')
@@ -858,6 +901,8 @@ if __name__ == '__main__':
     test_and_demo_exclude_if_present()
     for version in version_tests:
         test_version_warning(version)
+    for legA,legB in ((0,1),(1,0),(1,1)):
+        test_legacy_filelist(legA,legB)
 
     # hacked together parser. This is used to manually test whether the interactive
     # mode is working
