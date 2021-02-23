@@ -79,9 +79,9 @@ class Rclone:
             stderr = subprocess.STDOUT
             bufsize = 1
             universal_newlines = True
-        else:
+        else: # Stream both stdout and stderr to files to prevent a deadlock
             stdout = tempfile.NamedTemporaryFile(delete=False)
-            stderr = subprocess.PIPE
+            stderr = tempfile.NamedTemporaryFile(delete=False)
             bufsize = -1
             universal_newlines = False
             
@@ -105,12 +105,12 @@ class Rclone:
         
         if not stream:
             stdout.close()
+            stderr.close()
             with open(stdout.name,'rt') as F:
                 out = F.read()
-            err = proc.stderr.read()
+            with open(stderr.name,'rt') as F:
+                err = F.read()
             if err:
-                if isinstance(err,bytes):
-                    err = err.decode()
                 log(' rclone stderr:',err)
         
         if proc.returncode:
