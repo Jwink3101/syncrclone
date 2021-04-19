@@ -77,7 +77,7 @@ def test_main(remoteA,renamesA,remoteB,renamesB,compare,interactive=False):
     test.config.filter_flags = ['--filter','+ /yes/**',
                                 '--filter','- *.no']
     test.config.compare = compare
-    test.config.conflict_mode = 'newer_tag'
+    test.config.conflict_mode = 'newer_tag' # Deprecated. Update in the future
     
     test.config.log_dest = 'logs/'
     
@@ -383,9 +383,9 @@ def test_no_hashes():
     assert "WARNING No common hashes found and/or one or both remotes do not provide hashes. Falling back to 'mtime'" in stdout
     
     os.chdir(PWD0)
-    
-@pytest.mark.parametrize("conflict_mode",('A','B','older','newer','newer_tag','smaller','larger','tag'))
-def test_conflict_resolution(conflict_mode):
+
+@pytest.mark.parametrize("conflict_mode,tag_conflict",itertools.product(('A','B','older','newer','smaller','larger','tag'),(True,False)))
+def test_conflict_resolution(conflict_mode,tag_conflict):
     remoteA = 'A'
     remoteB = 'B'
     set_debug(False)   
@@ -394,6 +394,7 @@ def test_conflict_resolution(conflict_mode):
 
     ## Config
     test.config.conflict_mode = conflict_mode
+    test.config.tag_conflict = tag_conflict
     test.write_config()
     
     test.write_pre('A/file.txt','0')
@@ -403,7 +404,7 @@ def test_conflict_resolution(conflict_mode):
     test.write_post('B/file.txt','Bb',add_dt=20) # newer and larger
     
     print('-='*40);print('=-'*40)
-    test.sync()
+    test.sync(['--debug'])
     stdout = ''.join(test.synclogs[-1])
 
     diffs = test.compare_tree()
@@ -415,17 +416,20 @@ def test_conflict_resolution(conflict_mode):
     B = exists('A/file.txt') and test.read('A/file.txt') == 'Bb'
     tA = any(file.endswith('.A') for file in files)
     tB = any(file.endswith('.B') for file in files)
-    
+   
     if conflict_mode in ['A','older','smaller']:
-        assert (A,B,tA,tB) == (True,False,False,False), f"{conflict_mode} {(A,B,tA,tB)}"
+        res = (A,B) == (True,False)
+        tag = (tA,tB) == (False,True) if tag_conflict else (False,False)
     elif conflict_mode in ['B','newer','larger']:
-        assert (A,B,tA,tB) == (False,True,False,False), f"{conflict_mode} {(A,B,tA,tB)}"
-    elif conflict_mode in ['newer_tag']:
-        assert (A,B,tA,tB) == (False,True,True,False), f"{conflict_mode} {(A,B,tA,tB)}"
+        res =  (A,B) == False,True
+        tag = (tA,tB) == (True,False) if tag_conflict else (False,False)     
     elif conflict_mode in ['tag']:
-        assert (A,B,tA,tB) == (False,False,True,True), f"{conflict_mode} {(A,B,tA,tB)}"
+        res =  (A,B) == (False,False)
+        tag = (tA,tB) == (True,True)
     else:
         raise ValueError('Not studied') # Should not be here
+    assert res, f'Wrong res {A,B}, mode {conflict_mode,tag_conflict}'
+    assert tag, f'Wrong tag {tA,tB} mode {conflict_mode,tag_conflict}'
     os.chdir(PWD0)
 
 
@@ -887,8 +891,8 @@ if __name__ == '__main__':
         test_move_attribs(attrib)
     test_reuse_hash()    
     test_no_hashes()
-    for conflict_mode in ('A','B','older','newer','newer_tag','smaller','larger','tag'):
-        test_conflict_resolution(conflict_mode)
+    for conflict_mode,tag_conflict in itertools.product(('A','B','older','newer','smaller','larger','tag'),(True,False)):
+        test_conflict_resolution(conflict_mode,tag_conflict)
     test_backups(True)
     test_backups(False)
     test_backups(None) # set in config

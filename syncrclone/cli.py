@@ -85,29 +85,39 @@ class Config:
         config_ver = self._config['_syncrclone_version'].split('.')
         if config_ver != ['__VERSION__']:
             config_ver = (int(config_ver[0]),int(config_ver[1])) + tuple(config_ver[2:])
-            if config_ver < (20200826,0):
+            if config_ver < (20210419,0):
                 warnings.warn('Previous behavior of conflict_mode changed. Please update your config')
-                #raise ConfigError(f"Version '{self._config['_syncrclone_version']}' is too old. Update config")
+            #raise ConfigError(f"Version '{self._config['_syncrclone_version']}' is too old. Update config")
         
         for AB in 'AB':
             if  self._config[f'remote{AB}'] == "<<MUST SPECIFY>>":
                 raise ConfigError(f"Must specify 'remote{AB}'")
         
-        reqs = [
-            ('compare',('size','mtime','hash')),
-            ('hash_fail_fallback',('size','mtime',None)),
-            ('conflict_mode',('A','B','older','newer','newer_tag','smaller','larger','tag')),
-        ]
+        reqs = {
+            'compare':('size','mtime','hash'),
+            'hash_fail_fallback':('size','mtime',None),
+            'tag_conflict':(True,False),
+        }
         for AB in 'AB':
-            reqs.extend([
-                (f'reuse_hashes{AB}',(True,False)),
-                (f'renames{AB}',('size','mtime','hash','inode',None)),
-                ])
+            reqs[f'reuse_hashes{AB}'] = True,False
+            reqs[f'renames{AB}'] = 'size','mtime','hash','inode',None
+            
+        reqs['conflict_mode'] = ['tag',None]
+        for mode in ('A','B','older','newer','smaller','larger'):
+            reqs['conflict_mode'].extend([mode,f'{mode}_tag'])
         
-        for key,options in reqs:
+        for key,options in reqs.items():
             val = self._config[key]
             if val not in options:
                 raise ConfigError(f"'{key}' must be in {options}. Specified '{val}'")
+        
+        # To be deprecated
+        if self._config['conflict_mode'].endswith('_tag'):
+            newmode = self._config['conflict_mode'][:-4]
+            self._config['tag_conflict'] = True
+            warnings.warn((f" conflict_mode '{self._config['conflict_mode']}' deprecated. "
+                           f"Use `conflict_mode = {newmode}` and `tag_conflict = True`"))
+            self._config['conflict_mode'] = newmode
         
         log(f"A: '{self.remoteA}'")
         log(f"B: '{self.remoteB}'")

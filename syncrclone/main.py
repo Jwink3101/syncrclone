@@ -345,12 +345,20 @@ class SyncRClone:
             
             txt = f"    Resolving with mode '{config.conflict_mode}'"
             
+            if config.tag_conflict:        
+                tag_or_backupA = self.tagA 
+                tag_or_backupB = self.tagB 
+                txt += ' (tagging other)'
+            else:
+                tag_or_backupA = self.backupA 
+                tag_or_backupB = self.backupB
+            
             if config.conflict_mode == 'A':
                 self.transA2B.append(path)
-                self.backupB.append(path)
+                tag_or_backupB.append(path)
             elif config.conflict_mode == 'B':
                 self.transB2A.append(path)
-                self.backupA.append(path)
+                tag_or_backupA.append(path)
             elif config.conflict_mode == 'tag':
                 self.tagA.append(path) # Tags will *later* be added to transfer queue
                 self.tagB.append(path)
@@ -361,32 +369,22 @@ class SyncRClone:
             elif mA > mB:
                 if config.conflict_mode in ('newer','larger'):
                     self.transA2B.append(path)
-                    self.backupB.append(path)
+                    tag_or_backupB.append(path)
                     txt += '(keep A)'
                 elif config.conflict_mode in ('older','smaller'):
                     self.transB2A.append(path)
-                    self.backupA.append(path)
+                    tag_or_backupA.append(path)
                     txt += '(keep B)'
-                elif config.conflict_mode == 'newer_tag':
-                    self.transA2B.append(path)
-                    self.tagB.append(path)
-                    txt += '(keep A)'
-                # else: won't happen since we validated conflict modes
             elif mA < mB:
                 if config.conflict_mode in ('newer','larger'):
                     self.transB2A.append(path)
-                    self.backupA.append(path)
+                    tag_or_backupA.append(path)
                     txt += '(keep B)'
                 elif config.conflict_mode in ('older','smaller'):
                     self.transA2B.append(path)
-                    self.backupB.append(path)
+                    tag_or_backupB.append(path)
                     txt += '(keep A)'
-                elif config.conflict_mode == 'newer_tag':
-                    self.transB2A.append(path)
-                    self.tagA.append(path)
-                    txt += '(keep B)'
-                # else: won't happen since we validated conflict modes
-            else:
+            else:# else: won't happen since we validated conflict modes
                 raise ValueError('Comparison Failed. Please report to developer') # Should not be here
             
             log(txt)

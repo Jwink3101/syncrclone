@@ -89,7 +89,7 @@ rclone_flagsB = []
 compare = 'mtime'
 
 # When doing mtime comparisons, what is the error to allow
-dt = 2.5 # seconds
+dt = 1.1 # seconds
 
 # How to handle conflicts.
 # Note that even if comparison is done via hash, you can still resolve via
@@ -100,13 +100,14 @@ dt = 2.5 # seconds
 #   'tag'               : Tag both
 #
 #   'older','newer'     : Select the respective file. See note below.
-#   'newer_tag`         : Select newer and tag the older
-#
 #   'smaller','larger'  : Select the smaller or larger file
 #
-# A tag will append `.{time}.{A or B}` to the file
 # If a conflict cannot be resolved it will default to 'tag' and print a warning.
 conflict_mode = 'newer'
+
+# You can choose to tag the other file rather than overwrite it. If tagged,
+# it will get renamed to have appended `.{time}.{A or B}` to the file
+tag_conflict = False
 
 # Hashes can be expensive to compute on some remotes such as local or sftp.
 # As such, rather than recompute them all, the hashes of the previous state

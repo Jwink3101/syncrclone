@@ -2,6 +2,10 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20210419.0.BETA
+
+* Adds `tag_conflict` option and allows it with any other conflict mode. The use of modes likes `newer_tag` are deprecated but will continue to work...for now.
+
 ## 20210222.0.BETA
 
 * Fixed a bug where the `stderr` buffer could cause a deadlock on file listing (such as if there are a lot of errors)
