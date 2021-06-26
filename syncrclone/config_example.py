@@ -85,7 +85,6 @@ rclone_flagsB = []
 #
 # Notes: 
 #   * if using size, can have false negatives. 
-#   * If using hash or size, older and newer mean smaller and larger
 compare = 'mtime'
 
 # When doing mtime comparisons, what is the error to allow
@@ -97,7 +96,7 @@ dt = 1.1 # seconds
 # accordingly. See https://rclone.org/overview/
 #
 #   'A','B'             : Always select A or B
-#   'tag'               : Tag both
+#   'tag'               : Tag both. Makes tag_conflict irrelevant 
 #
 #   'older','newer'     : Select the respective file. See note below.
 #   'smaller','larger'  : Select the smaller or larger file

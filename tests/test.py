@@ -214,8 +214,9 @@ def test_main(remoteA,renamesA,remoteB,renamesB,compare,interactive=False):
 
     assert test.read('A/EditOnBoth_Anewer.txt') == 'A will be newerAAAa'
     assert test.read('A/EditOnBoth_Bnewer.txt') == 'B will be newerBBBb'
-    assert exists('A/EditOnBoth_Anewer.txt.*.B'), "Not tagged"
-    assert exists('A/EditOnBoth_Bnewer.txt.*.A'), "Not tagged"
+    assert exists('A/EditOnBoth_Anewer.*.B.txt'), "Not tagged"
+    assert exists('A/EditOnBoth_Bnewer.*.A.txt'), "Not tagged"
+
     
     assert test.read('B/MovedEditedOnBoth_Bnewer.txt').endswith('BB')
     
@@ -414,8 +415,8 @@ def test_conflict_resolution(conflict_mode,tag_conflict):
     
     A = exists('A/file.txt') and test.read('A/file.txt') == 'A'
     B = exists('A/file.txt') and test.read('A/file.txt') == 'Bb'
-    tA = any(file.endswith('.A') for file in files)
-    tB = any(file.endswith('.B') for file in files)
+    tA = any(file.endswith('.A.txt') for file in files)
+    tB = any(file.endswith('.B.txt') for file in files)
    
     if conflict_mode in ['A','older','smaller']:
         res = (A,B) == (True,False)
@@ -883,36 +884,36 @@ def test_legacy_filelist(legA,legB):
 if __name__ == '__main__':
     test_main('A','hash','B','hash','mtime') # Vanilla test covered below
     
-    test_main('A','inode','cryptB:','mtime','mtime')
-    test_main('cryptA:','size','cryptB:','mtime','mtime')
-    for remoteA,renamesA,remoteB,renamesB,compare in MAIN_TESTS:
-        test_main(remoteA,renamesA,remoteB,renamesB,compare)        
-    for attrib in ('size','mtime','hash','inode',None):
-        test_move_attribs(attrib)
-    test_reuse_hash()    
-    test_no_hashes()
-    for conflict_mode,tag_conflict in itertools.product(('A','B','older','newer','smaller','larger','tag'),(True,False)):
-        test_conflict_resolution(conflict_mode,tag_conflict)
-    test_backups(True)
-    test_backups(False)
-    test_backups(None) # set in config
-    test_dry_run()
-    test_logs()
-    test_three_way()
-    test_locks()
-    test_local_mode()
-    test_redacted_PW_and_modules_in_config_file()
-    test_and_demo_exclude_if_present()
-    for version in version_tests:
-        test_version_warning(version)
-    for legA,legB in ((0,1),(1,0),(1,1)):
-        test_legacy_filelist(legA,legB)
-
-    # hacked together parser. This is used to manually test whether the interactive
-    # mode is working
-    if len(sys.argv) > 1 and sys.argv[1] == '-i':
-        test_main('A','hash','B','hash','mtime',interactive=True)
-
+#     test_main('A','inode','cryptB:','mtime','mtime')
+#     test_main('cryptA:','size','cryptB:','mtime','mtime')
+#     for remoteA,renamesA,remoteB,renamesB,compare in MAIN_TESTS:
+#         test_main(remoteA,renamesA,remoteB,renamesB,compare)        
+#     for attrib in ('size','mtime','hash','inode',None):
+#         test_move_attribs(attrib)
+#     test_reuse_hash()    
+#     test_no_hashes()
+#     for conflict_mode,tag_conflict in itertools.product(('A','B','older','newer','smaller','larger','tag'),(True,False)):
+#         test_conflict_resolution(conflict_mode,tag_conflict)
+#     test_backups(True)
+#     test_backups(False)
+#     test_backups(None) # set in config
+#     test_dry_run()
+#     test_logs()
+#     test_three_way()
+#     test_locks()
+#     test_local_mode()
+#     test_redacted_PW_and_modules_in_config_file()
+#     test_and_demo_exclude_if_present()
+#     for version in version_tests:
+#         test_version_warning(version)
+#     for legA,legB in ((0,1),(1,0),(1,1)):
+#         test_legacy_filelist(legA,legB)
+# 
+#     # hacked together parser. This is used to manually test whether the interactive
+#     # mode is working
+#     if len(sys.argv) > 1 and sys.argv[1] == '-i':
+#         test_main('A','hash','B','hash','mtime',interactive=True)
+# 
 
     print('*'*80)
     print(' ALL PASSED')

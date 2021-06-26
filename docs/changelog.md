@@ -2,6 +2,12 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20210626.0.BETA
+
+- Changes the conflict resolution naming to keep the extension the same for easier inspection. 
+    - Example: It used to be `MovedEditedOnBoth_Bnewer.txt.20210626T155458.A` and is now `MovedEditedOnBoth_Bnewer.20210626T155458.A.txt`
+    - Updated tests for new name
+
 ## 20210419.0.BETA
 
 * Adds `tag_conflict` option and allows it with any other conflict mode. The use of modes likes `newer_tag` are deprecated but will continue to work...for now.

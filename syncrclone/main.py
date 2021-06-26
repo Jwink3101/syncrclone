@@ -1,4 +1,5 @@
 import copy
+import json
 import time
 import sys,os,shutil
 import warnings
@@ -305,6 +306,8 @@ class SyncRClone:
             compA = self.compare(fileA,fileAp)
             compB = self.compare(fileB,fileBp)
             
+            debug(f"Resolving:\n{json.dumps({'A':fileA,'Ap':fileAp,'B':fileB,'Bp':fileB},indent=1)}")
+            
             if compA and compB:
                 # This really shouldn't happen but if it does, just move on to
                 # conflict resolution
@@ -482,7 +485,8 @@ class SyncRClone:
         moves =  getattr(self,f'moves{AB}')
 
         for file in tag:
-            dest = f'{file}.{self.now_compact}.{AB}'
+            root,ext = os.path.splitext(file)
+            dest = f'{root}.{self.now_compact}.{AB}{ext}'
             moves.append((file,dest))
             debug(f"Added '{file}' --> '{dest}'")
             
