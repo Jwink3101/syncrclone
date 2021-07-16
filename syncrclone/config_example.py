@@ -123,6 +123,11 @@ reuse_hashesB = False
 # built into BOTH remotes
 backup = True
 
+# Specify whether to also sync the backed up files between A and B. If True,
+# both remotes will have all of the backups. If False, each remote will only
+# have what it backed up on the respective side
+sync_backups = False
+
 # Some remotes do not support hashes at all (e.g crypt) while others do not 
 # always return a hash for all files (e.g. S3). When this is encountered,
 # syncrclone can fall back to another `compare` or `renames{AB}` attribute.
@@ -136,7 +141,7 @@ hash_fail_fallback = None # {'size','mtime',None}
 # They are not strictly needed and require extra rclone calls. As such, they 
 # can be disabled. Note even if setting locks if disabled, syncrclone will
 # still respect them!
-set_lock = True
+set_lock = False
 
 ## Rename Tracking
 
@@ -166,8 +171,8 @@ renamesB = None
 # is more than one syncpair
 #
 # Can also specify a local location. Useful if both remotes are remote. Recall
-# that the paths are relative to this file
-log_dest = '' # Relative to root of each remote
+# that the paths are relative to this file. If blank, will not save logs
+log_dest = '.syncrclone/logs' # Relative to root of each remote
 local_log_dest = ''
 
 

@@ -38,10 +38,16 @@ class Rclone:
         
         self.validate()
         
+#         self.backup_path = {
+#             f'{AB}':os.path.join(getattr(config,f'remote{AB}'),
+#                                  '.syncrclone','backups',f'{AB}_{config.now}')
+#                             for AB in 'AB'}
+        self.backup_path0 = {
+            f'{AB}':f'.syncrclone/backups/{config.now}_{self.config.name}_{AB}' 
+                                                                 for AB in 'AB'}
         self.backup_path = {
-            f'{AB}':os.path.join(getattr(config,f'remote{AB}'),
-                                 '.syncrclone','backups',f'{AB}_{config.now}')
-                            for AB in 'AB'}
+            f'{AB}':os.path.join(getattr(config,f'remote{AB}'),self.backup_path0[AB])
+                                                                 for AB in 'AB'}
         
         log('rclone version:')
         self.call(['--version'],stream=True)
@@ -360,8 +366,12 @@ class Rclone:
                     
                     if action in ['delete','move']:
                         cmd[0] = 'moveto' # non-backup deletes are in the original conditional
-                    else:
-                        cmd[0] = 'copyto' # Keep the original on delete
+                    else: # backup
+                        # Keep the original. Doesn't really matter with rclone 
+                        # since it always transfers the whole file but this way
+                        # it just shows as overwrite, not delete and new if the
+                        # remote cares
+                        cmd[0] = 'copyto' 
 #                     log(t)
                     self.call(cmd + [src,dest],stream=True)
     

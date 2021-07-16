@@ -41,7 +41,7 @@ class Config:
             outpath = self._configpath
             
         txt = self._template.replace('__VERSION__',__version__)
-        txt = txt.replace('__RANDOM__',utils.random_str(12))
+        txt = txt.replace('__RANDOM__',utils.random_str(5))
         
         if localmode:
             txt = txt.replace('remoteA = "<<MUST SPECIFY>>"','remoteA = "../" # set automatically')

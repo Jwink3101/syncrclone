@@ -2,6 +2,13 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20210716.0.BETA
+
+- Adds the `sync_backups` option where backups on each side are also kept in sync. Defaults to False
+- Backups are now stored in `{date}_{name}_{AorB}` rather than the old system
+- Changes default config to not set a lock and to always save the logs
+- Fix for erroneously *reporting* backup even when turned off (even though they correctly were not done)
+
 ## 20210626.0.BETA
 
 - Changes the conflict resolution naming to keep the extension the same for easier inspection. 

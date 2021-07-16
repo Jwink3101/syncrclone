@@ -54,7 +54,10 @@ MAIN_TESTS.extend(get_MAIN_TESTS())
     
 
 @pytest.mark.parametrize("remoteA,renamesA,remoteB,renamesB,compare",MAIN_TESTS)
-def test_main(remoteA,renamesA,remoteB,renamesB,compare,interactive=False):
+def test_main(remoteA,renamesA,
+              remoteB,renamesB,
+              compare,
+              interactive=False):
     """
     Main test with default settings (if the defaults change, this will need to
     be updated. A few minor changes from the defaults are also made
@@ -186,8 +189,8 @@ def test_main(remoteA,renamesA,remoteB,renamesB,compare,interactive=False):
     assert test.read('A/EditOnB.txt') == 'Edit on BEdited on B',"mod did not propogate"
     assert not exists('A/EditOnA.txt.*'),'Should NOT have been tagged'
     assert not exists('A/EditOnB.txt.*'),'Should NOT have been tagged'
-    assert test.globread('B/.syncrclone/backups/B_*/EditOnA.txt') == 'Edit on A','not backed up'
-    assert test.globread('A/.syncrclone/backups/A_*/EditOnB.txt') == 'Edit on B','not backed up'
+    assert test.globread('B/.syncrclone/backups/*_B/EditOnA.txt') == 'Edit on A','not backed up'
+    assert test.globread('A/.syncrclone/backups/*_A/EditOnB.txt') == 'Edit on B','not backed up'
         
     # Moves w/o edit
     assert not exists('A/MoveOnB.txt')
@@ -222,8 +225,8 @@ def test_main(remoteA,renamesA,remoteB,renamesB,compare,interactive=False):
     
     assert not exists('A/delA.txt')
     assert not exists('A/delB.txt')
-    assert exists('A/.syncrclone/backups/A_*/delB.txt'), "did not backup"
-    assert exists('B/.syncrclone/backups/B_*/delA.txt'), "did not backup"
+    assert exists('A/.syncrclone/backups/*_A/delB.txt'), "did not backup"
+    assert exists('B/.syncrclone/backups/*_B/delA.txt'), "did not backup"
 
     assert exists('A/delB modA.txt') # Should not have been deleted
     assert "DELETE CONFLICT: File 'delB modA.txt' deleted on B but modified on A. Transfering" in stdout
@@ -237,7 +240,7 @@ def test_main(remoteA,renamesA,remoteB,renamesB,compare,interactive=False):
     assert exists('A/yes/newB.yes.no')
 
     assert test.read('A/unic°de and space$.txt') == 'UTF8works'
-    assert exists('A/.syncrclone/backups/A_*/uni*.txt'),'did not back up'
+    assert exists('A/.syncrclone/backups/*_A/uni*.txt'),'did not back up'
     
     os.chdir(PWD0)
 
@@ -434,14 +437,15 @@ def test_conflict_resolution(conflict_mode,tag_conflict):
     os.chdir(PWD0)
 
 
-@pytest.mark.parametrize("backup",(True,False,None))
-def test_backups(backup):
+@pytest.mark.parametrize("backup,sync",itertools.product((True,False,None),(True,False)))
+def test_backups(backup,sync):
     remoteA = 'A'
     remoteB = 'B'
     set_debug(False)   
     
     test = testutils.Tester('backups',remoteA,remoteB)   
     test.config.conflict_mode = 'newer'
+    test.config.sync_backups = sync
     test.write_config()
     
     test.write_pre('A/ModifiedOnA.txt','A')
@@ -474,9 +478,13 @@ def test_backups(backup):
     assert exists('A/ModifiedOnA.txt') and test.read('A/ModifiedOnA.txt') == 'A1'
     assert exists('A/ModifiedOnB.txt') and test.read('A/ModifiedOnB.txt') == 'B1'
     
-    backedA = glob.glob('A/.*/backups/A_*/*')
-    backedB = glob.glob('B/.*/backups/B_*/*')
+    backedA = glob.glob('A/.*/backups/*_A/*') # only one level deep
+    backedB = glob.glob('B/.*/backups/*_B/*')
     
+    # synced backups
+    backedAonB = glob.glob('B/.*/backups/*_A/*') # only one level deep
+    backedBonA = glob.glob('A/.*/backups/*_B/*')
+        
     if backup:
         assert len(backedA) == len(backedB) == len(backedB) == len(backedB) == 2
         
@@ -488,7 +496,23 @@ def test_backups(backup):
         assert all(test.read(f) == 'A' for f in backedB) # not A1
         assert all(file.endswith('A.txt') for file in backedB)
     else: # False and None
-        assert len(backedA) == len(backedB) == len(backedB) == len(backedB) == 0
+        assert  len(backedA) == \
+                len(backedB) == \
+                len(backedB) == \
+                len(backedB) == \
+                len(backedAonB) == \
+                len(backedBonA) == 0
+    
+    if sync:
+        # Hash all of the files and make sure they all agree. Use the name 
+        # without A or B. Dict equality will include
+        hashesA = {f[2:]:testutils.adler32(f) for f in backedA}
+        hashesB = {f[2:]:testutils.adler32(f) for f in backedB}
+        hashesAonB = {f[2:]:testutils.adler32(f) for f in backedAonB}
+        hashesBonA = {f[2:]:testutils.adler32(f) for f in backedBonA}
+        assert hashesA == hashesAonB,'backups were not synced for A'
+        assert hashesB == hashesBonA,'backups were not synced for B'
+
         
     os.chdir(PWD0)
 
@@ -882,7 +906,7 @@ def test_legacy_filelist(legA,legB):
     os.chdir(PWD0)
 
 if __name__ == '__main__':
-    test_main('A','hash','B','hash','mtime') # Vanilla test covered below
+#     test_main('A','hash','B','hash','mtime') # Vanilla test covered below
     
 #     test_main('A','inode','cryptB:','mtime','mtime')
 #     test_main('cryptA:','size','cryptB:','mtime','mtime')
@@ -894,9 +918,8 @@ if __name__ == '__main__':
 #     test_no_hashes()
 #     for conflict_mode,tag_conflict in itertools.product(('A','B','older','newer','smaller','larger','tag'),(True,False)):
 #         test_conflict_resolution(conflict_mode,tag_conflict)
-#     test_backups(True)
-#     test_backups(False)
-#     test_backups(None) # set in config
+#     for backup,sync in itertools.product((True,False,None),(True,False)):
+#         test_backups(backup,sync) 
 #     test_dry_run()
 #     test_logs()
 #     test_three_way()

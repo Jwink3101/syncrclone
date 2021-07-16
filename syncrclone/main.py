@@ -86,23 +86,34 @@ class SyncRClone:
         else:
             self.summarize(dry=False)  
         
+        # Do actions. Clear the backup list if not using rather than keep around.
+        # This way, we do not accidentally transfer it if not backed up
+        if not config.backup: # Delete in place though I don't think it matters
+            del self.backupA[:]
+            del self.backupB[:]
         log('');log('Performing Actions on A')
         self.rclone.delete_backup_move('A',self.delA,'delete')
-        if config.backup: 
-            self.rclone.delete_backup_move('A',self.backupA,'backup')
+        self.rclone.delete_backup_move('A',self.backupA,'backup')
         self.rclone.delete_backup_move('A',self.movesA,'move')
         if config.backup and (self.delA or self.backupA):
             log(f"""Backups for A stored in '{self.rclone.backup_path["A"]}'""")
         
         log('');log('Performing Actions on B')
         self.rclone.delete_backup_move('B',self.delB,'delete')
-        if config.backup: 
-            self.rclone.delete_backup_move('B',self.backupB,'backup')
+        self.rclone.delete_backup_move('B',self.backupB,'backup')
         self.rclone.delete_backup_move('B',self.movesB,'move')
         if config.backup and (self.delB or self.backupB):
             log(f"""Backups for B stored in '{self.rclone.backup_path["B"]}'""")
         
-        
+        # Add the backed up files to be transfered too. This way the backups 
+        # are on *both* systems. Only del and backup lists add to the backup.
+        # Keep as part of the single transfer
+        if config.backup and config.sync_backups:
+            self.transA2B.extend(os.path.join(self.rclone.backup_path0['A'],f) 
+                for f in self.delA + self.backupA)
+            self.transB2A.extend(os.path.join(self.rclone.backup_path0['B'],f) 
+                for f in self.delB + self.backupB)
+            
         # Perform final transfers
         sumA = utils.file_summary([self.currA.query_one(Path=f) for f in self.transA2B])
         log('');log(f'A >>> B {sumA}')
@@ -179,8 +190,10 @@ class SyncRClone:
         else:
             raise ValueError() # Just in case I screw up later
         
-        attr_names = {'del':'delete (with{} backup)'.format('out' if not self.config.backup else ''),
+        attr_names = {'del':'Delete (with{} backup)'.format('out' if not self.config.backup else ''),
                       'backup':'Backup'}
+        if not self.config.backup:
+            attr_names['backup'] = "Will overwrite (w/o backup)"
             
         for AB in 'AB':
             log('')

@@ -9,6 +9,7 @@ import io
 import re
 import builtins
 import glob
+import zlib
 
 PWD0 =  os.path.abspath(os.path.dirname(__file__))
 os.chdir(PWD0)
@@ -192,6 +193,29 @@ class Tester:
                 result.add( ('disagree',fileAB))
             
         return result
+
+def adler32(filepath,blocksize=2**20):
+    """
+    Return the ader32 of a file as an 8-byte hex number
+    
+    `blocksize` adjusts how much of the file is read into memory at a time.
+    This is useful for large files.
+        2**20 = 1024 * 1024 = 1 mb
+        2**12 = 4 * 1024    = 4 kb
+    """
+    csum = 1
+    with open(filepath, 'rb') as afile:
+        buf = afile.read(blocksize)
+        while len(buf) > 0:
+            csum = zlib.adler32(buf,csum)
+            buf = afile.read(blocksize)
+    # From the documentation:
+    #  > Changed in version 3.0: Always returns an unsigned value.
+    #  > To generate the same numeric value across all Python versions and
+    #  > platforms, use crc32(data) & 0xffffffff.
+    csum = csum & 0xffffffff
+    return ('0'*8 + hex(csum)[2:])[-8:] # Preceding 0s
+    
         
 def change_time(path,time_adj):
     """ Change the time on a file path"""
