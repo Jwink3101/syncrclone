@@ -2,6 +2,11 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20210718.0.BETA
+
+- Performs move, deletes, and backups with multiple threads. This setting is *independant* of `--transfers` or `--checkers` in rclone config settings. It is controlled by the new `action_threads` option 
+    - defaults to `__CPU_COUNT__ // 1.5`
+
 ## 20210716.0.BETA
 
 - Adds the `sync_backups` option where backups on each side are also kept in sync. Defaults to False

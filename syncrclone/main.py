@@ -91,17 +91,14 @@ class SyncRClone:
         if not config.backup: # Delete in place though I don't think it matters
             del self.backupA[:]
             del self.backupB[:]
+        
         log('');log('Performing Actions on A')
-        self.rclone.delete_backup_move('A',self.delA,'delete')
-        self.rclone.delete_backup_move('A',self.backupA,'backup')
-        self.rclone.delete_backup_move('A',self.movesA,'move')
+        self.rclone.delete_backup_move('A',self.delA,self.backupA,self.movesA)
         if config.backup and (self.delA or self.backupA):
             log(f"""Backups for A stored in '{self.rclone.backup_path["A"]}'""")
         
         log('');log('Performing Actions on B')
-        self.rclone.delete_backup_move('B',self.delB,'delete')
-        self.rclone.delete_backup_move('B',self.backupB,'backup')
-        self.rclone.delete_backup_move('B',self.movesB,'move')
+        self.rclone.delete_backup_move('B',self.delB,self.backupB,self.movesB)
         if config.backup and (self.delB or self.backupB):
             log(f"""Backups for B stored in '{self.rclone.backup_path["B"]}'""")
         
@@ -120,7 +117,7 @@ class SyncRClone:
         self.rclone.transfer('A2B',self.transA2B)
         
         sumB = utils.file_summary([self.currB.query_one(Path=f) for f in self.transB2A])
-        log('');log(f'B >>> A {sumB}')
+        log('');log(f'A <<< B {sumB}')
         self.rclone.transfer('B2A',self.transB2A)
 
         # Update lists if needed
@@ -213,9 +210,9 @@ class SyncRClone:
         log('');log(f'{tt}A >>> B {sumA}')
         for file in self.transA2B:
             log(f"{tt}Transfer A >>> B: '{file}'")
-        log('');log(f'{tt}B >>> A {sumB}')
+        log('');log(f'{tt}A <<< B {sumB}')
         for file in self.transB2A:
-            log(f"{tt}Transfer B >>> A: '{file}'")
+            log(f"{tt}Transfer A <<< B: '{file}'")
             
     def echo_queues(self,descr=''):
         debug(f'Printing Queueus {descr}')

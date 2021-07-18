@@ -7,6 +7,7 @@ from collections import deque
 import subprocess
 import lzma
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 
 from . import debug,log
 from .cli import ConfigError
@@ -60,10 +61,10 @@ class Rclone:
                 if v in FILTER_FLAGS:
                     raise ConfigError(f"'{attr}' cannot have '{v}' or any other filtering flags")
         
-    def call(self,cmd,stream=False):
+    def call(self,cmd,stream=False,logstderr=True):
         """
         Call rclone. If streaming, will write stdout & stderr to
-        log
+        log. If logstderr, will always send stderr to log (default)
         """
         cmd = [self.config.rclone_exe] + cmd
         debug('rclone:call',cmd)
@@ -116,11 +117,13 @@ class Rclone:
                 out = F.read()
             with open(stderr.name,'rt') as F:
                 err = F.read()
-            if err:
+            if err and logstderr:
                 log(' rclone stderr:',err)
         
         if proc.returncode:
             raise subprocess.CalledProcessError(proc.returncode,cmd,output=out,stderr=err)
+        if not logstderr:
+            out = out + '\n' + err
         return out
     
     def push_file_list(self,filelist,remote=None):        
@@ -322,13 +325,12 @@ class Rclone:
 
         return files,prev_list
 
-    def delete_backup_move(self,remote,files,action):
+    def delete_backup_move(self,remote,dels,backups,moves):
         """
         Perform deletes, backups and moves. Same basic codes but with different
         reporting. If moves, files are (src,dest) tuples.
         """
-        if not files:
-            return
+
         config = self.config
         AB = remote
         remote = {'A':config.remoteA,'B':config.remoteB}[remote]
@@ -337,43 +339,68 @@ class Rclone:
         cmd += ['-v','--stats-one-line','--log-format','']
         cmd += config.rclone_flags + self.add_args + getattr(config,f'rclone_flags{AB}')
         
+        
+        actions = [('backup',file) for file in backups] + \
+                  [('move',file) for file in moves] + \
+                  [('delete',file) for file in dels]
+
+#       # There used to be an optimization to do deletes with backup in a more
+#       # streamlined way but for the sake of simplicity and since it is now
+#       # threaded, this codepath is removed            
+#       if dels and not config.backup: # This is the only one optimized
+#           # Can be done in one call.
+#           tmpfile = self.tmpdir + f'{AB}_del'
+#           with open(tmpfile,'wt') as file:
+#               file.write('\n'.join(files))
+#           cmd += ['--files-from',tmpfile,remote]
+#           cmd[0] = 'delete'
+#           self.call(cmd,stream=True)
+#       else:
+#           actions.extend([('delete',file) for file in dels])
+
+        # Moves have to iterated to not overlap. Also, do not need to list
+        # the final dest so --no-traverse. Also add --no-check-dest since
+        # no need to check the destination since we know it's (empty) state.
+        # The docs suggest --retries 1 but we are *only* done a single file
+        # at a time so we want it to retry on all files
+        cmd += ['--no-traverse','--no-check-dest','--ignore-times']# + ['--retries','1']  
             
-        if action == 'delete' and not config.backup: # This is the only one optimized
-            # Can be done in one call.
-            tmpfile = self.tmpdir + f'{AB}_del'
-            with open(tmpfile,'wt') as file:
-                file.write('\n'.join(files))
-            cmd += ['--files-from',tmpfile,remote]
-            cmd[0] = 'delete'
-            self.call(cmd,stream=True)
-        else:
+        def do_action(action_file):
+            
+            _cmd = cmd.copy() # Make a (thread) local copy
+            action,file = action_file
             b = ' (w/ backup)' if action == 'delete' else ''
-            # Moves have to iterated to not overlap. Also, do not need to list
-            # the final dest so --no-traverse. Also add --no-check-dest since
-            # no need to check the destination since we know it's (empty) state.
-            # The docs suggest --retries 1 but we are *only* done a single file
-            # at a time so we want it to retry on all files
-            cmd += ['--no-traverse','--no-check-dest','--ignore-times']# + ['--retries','1']  
-            for file in files:
-                    if action in ['delete','backup']:
-                        src = os.path.join(remote,file)
-                        dest = os.path.join(self.backup_path[AB],file)
-                        t = f"{action}{b} {AB}: '{file}'"
-                    else:
-                        src = os.path.join(remote,file[0])
-                        dest = os.path.join(remote,file[1])
-                        t = f"move {AB}: '{file[0]}' --> '{file[1]}'"
-                    
-                    if action in ['delete','move']:
-                        cmd[0] = 'moveto' # non-backup deletes are in the original conditional
-                    else: # backup
-                        # Keep the original. Doesn't really matter with rclone 
-                        # since it always transfers the whole file but this way
-                        # it just shows as overwrite, not delete and new if the
-                        # remote cares
-                        cmd[0] = 'copyto' 
-#                     log(t)
-                    self.call(cmd + [src,dest],stream=True)
+            
+            if action in ['delete','backup']:
+                src = os.path.join(remote,file)
+                dest = os.path.join(self.backup_path[AB],file)
+                t = f"{action}{b} {AB}: '{file}'"
+            else:
+                src = os.path.join(remote,file[0])
+                dest = os.path.join(remote,file[1])
+                t = f"move {AB}: '{file[0]}' --> '{file[1]}'"
+            srcdest = [src,dest]
+            
+            ### FIX HERE
+            if action == 'move' or (action == 'delete' and config.backup):
+                _cmd[0] = 'moveto' # non-backup deletes are in the original conditional
+            elif action == 'delete' and not config.backup:
+                _cmd[0] = 'delete'
+                del srcdest[-1] # remove the dest
+            else: # backup
+                # Keep the original. Doesn't really matter with rclone 
+                # since it always transfers the whole file but this way
+                # it just shows as overwrite, not delete and new if the
+                # remote cares
+                _cmd[0] = 'copyto' 
+                
+            return self.call(_cmd + srcdest,stream=False,logstderr=False)
+            
+        with ThreadPoolExecutor(max_workers=int(config.action_threads)) as exe:
+            for res in exe.map(do_action,actions):
+                for line in res.split('\n'):
+                    line = line.strip()
+                    if line: log('rclone:',line) 
     
     def transfer(self,mode,files):
         config = self.config

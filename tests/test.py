@@ -906,8 +906,8 @@ def test_legacy_filelist(legA,legB):
     os.chdir(PWD0)
 
 if __name__ == '__main__':
-#     test_main('A','hash','B','hash','mtime') # Vanilla test covered below
-    
+    test_main('A','hash','B','hash','mtime') # Vanilla test covered below
+   
 #     test_main('A','inode','cryptB:','mtime','mtime')
 #     test_main('cryptA:','size','cryptB:','mtime','mtime')
 #     for remoteA,renamesA,remoteB,renamesB,compare in MAIN_TESTS:
@@ -919,7 +919,7 @@ if __name__ == '__main__':
 #     for conflict_mode,tag_conflict in itertools.product(('A','B','older','newer','smaller','larger','tag'),(True,False)):
 #         test_conflict_resolution(conflict_mode,tag_conflict)
 #     for backup,sync in itertools.product((True,False,None),(True,False)):
-#         test_backups(backup,sync) 
+#         test_backups(backup,sync)
 #     test_dry_run()
 #     test_logs()
 #     test_three_way()
@@ -934,8 +934,8 @@ if __name__ == '__main__':
 # 
 #     # hacked together parser. This is used to manually test whether the interactive
 #     # mode is working
-#     if len(sys.argv) > 1 and sys.argv[1] == '-i':
-#         test_main('A','hash','B','hash','mtime',interactive=True)
+    if len(sys.argv) > 1 and sys.argv[1] == '-i':
+        test_main('A','hash','B','hash','mtime',interactive=True)
 # 
 
     print('*'*80)

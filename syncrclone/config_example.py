@@ -11,8 +11,8 @@ Flags should always be a list.
 Example: `--exclude myfile` will be ['--exclude','myfile']
 
 This is *ALWAYS* evaluated from the parent of this file.
-"""
 
+"""
 ## Remotes:
 
 # Specify the remotes to be used in the rclone config. This should be the 
@@ -142,6 +142,15 @@ hash_fail_fallback = None # {'size','mtime',None}
 # can be disabled. Note even if setting locks if disabled, syncrclone will
 # still respect them!
 set_lock = False
+
+
+# While transfers will follow the respective rclone flags 
+# (e.g. ['--transfers','10'], delete, copy, and move actions all happen with
+# their own call to rclone. This happens in threads to speed it up. This can
+# be toggled. 
+action_threads = __CPU_COUNT__ // 1.5
+# action_threads = 4
+
 
 ## Rename Tracking
 

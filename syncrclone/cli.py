@@ -66,6 +66,7 @@ class Config:
 
         self._config['__file__'] = os.path.abspath(self._configpath)
         self._config['__dir__'] = os.path.dirname(self._config['__file__'])
+        self._config['__CPU_COUNT__'] = os.cpu_count()
         
         exec(self._template, self._config)
         
