@@ -905,8 +905,83 @@ def test_legacy_filelist(legA,legB):
     #test.sync() # Just to see if the log changed in manual testing
     os.chdir(PWD0)
 
+@pytest.mark.parametrize("emptyA,emptyB",itertools.product([True,False,None],[True,False,None]))
+def test_emptydir(emptyA,emptyB):
+    # Because of the nature of how I set up the tests with any other remote,
+    # they can't be tested directly since it is compared against another sync
+    # of the files.
+    #
+    # While not idea, the removal of empty directories is pretty minor...
+    remoteA = 'A'
+    remoteB = 'B'
+    set_debug(False)   
+    
+    test = testutils.Tester('empty_dir',remoteA,remoteB)   
+    test.config.filter_flags = ['--filter','- *.no']
+    test.config.cleanup_empty_dirsA = emptyA
+    test.config.cleanup_empty_dirsB = emptyB
+    test.write_config()
+    
+    test.write_pre('A/move/move.txt','A') # Parents should delete
+    test.write_pre('A/deep/deeper/deepest/dddeep.txt','DEEP') # parents should delete
+    test.write_pre('A/del/del.txt','A') # parents should delete
+    
+    test.write_pre('A/delfilter/del2.txt','del2')
+    
+    os.makedirs('A/emptypre') # should remain
+    os.makedirs('A/emptypre_deep/deeppre') # should remain
+    
+    test.setup()
+    
+    # remove the stuff and also newly empty dirs
+    shutil.rmtree('A/del') # 1
+    
+    test.move('B/move','B/moved') # 2
+    
+    test.move('A/deep/deeper/deepest/dddeep.txt','A/shallow.txt') # 3
+    shutil.rmtree('A/deep')
+    
+    shutil.rmtree('A/delfilter/') # 4: Removed on A but an ignored...
+    test.write('B/delfilter/me.no','ignore') # ...file is still present
+    
+    os.makedirs('A/emptypostA/deeperpostA') # should remain
+    os.makedirs('B/emptypostB') # should remain
+    
+    test.sync()
+    
+    # Compare
+    diffs = test.compare_tree()
+    assert diffs == {('missing_inA', 'delfilter/me.no')}
+
+    # Previously empty and still should be there. Note that empty dirs
+    # do not sync so do not check on each side. Also, only need to 
+    # check the deepest since that implies the others are still there
+    assert os.path.exists('A/emptypre')
+    assert os.path.exists('A/emptypre_deep/deeppre') 
+    assert os.path.exists('A/emptypostA/deeperpostA')
+    
+    assert os.path.exists('B/emptypostB')
+    
+    assert os.path.exists('B/delfilter/me.no') # 4 Make sure this was *not* deleted
+    
+    # These should be deleted on BOTH
+    if emptyA or emptyA is None:
+        assert not os.path.exists('A/move') # 2
+    else:
+        assert os.path.exists('A/move')
+
+    if emptyB or emptyB is None:
+        assert not os.path.exists('B/del') #1
+        assert not os.path.exists('B/deep/deeper/deepest') # 3
+    else:
+        assert os.path.exists('B/del') #1
+        assert os.path.exists('B/deep/deeper/deepest') # 3
+    
+    os.chdir(PWD0)
+
+
 if __name__ == '__main__':
-    test_main('A','hash','B','hash','mtime') # Vanilla test covered below
+    #test_main('A','hash','B','hash','mtime') # Vanilla test covered below
    
 #     test_main('A','inode','cryptB:','mtime','mtime')
 #     test_main('cryptA:','size','cryptB:','mtime','mtime')
@@ -931,9 +1006,12 @@ if __name__ == '__main__':
 #         test_version_warning(version)
 #     for legA,legB in ((0,1),(1,0),(1,1)):
 #         test_legacy_filelist(legA,legB)
-# 
-#     # hacked together parser. This is used to manually test whether the interactive
-#     # mode is working
+#     for emptyA,emptyB in itertools.product([True,False,None],[True,False,None]):    
+#         test_emptydir(emptyA,emptyB) 
+
+
+    # hacked together parser. This is used to manually test whether the interactive
+    # mode is working
     if len(sys.argv) > 1 and sys.argv[1] == '-i':
         test_main('A','hash','B','hash','mtime',interactive=True)
 # 

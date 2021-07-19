@@ -182,7 +182,13 @@ Using `--dry-run` should illuminate any issues but if you're uncertain, make a b
 [1]:https://github.com/Jwink3101/syncrclone/issues/1
 
 
+## Removing empty dirs
 
+As noted in the config, syncrclone can remove directories that are *made empty* by syncrclone (e.g. deleted or moved entire directory). It will not try to delete other empty directories.
+
+This is only useful if the remote even supports empty directories. If it does not (e.g. B2, S3, other object stores), then there is no reason to have this on.
+
+Leave on `None` to let syncrclone decide based on whether or not the remote supports them.
 
 
 

@@ -151,6 +151,16 @@ set_lock = False
 action_threads = __CPU_COUNT__ // 1.5
 # action_threads = 4
 
+# syncrclone does not transfer empty directories however if a directory is
+# empty after a sync and it was NOT empty before (e.g. the directory was moved 
+# or deleted),then it can remove them. Note that (a) this only removes 
+# directories that were *made* empty by syncrclone, and (b) if files still 
+# exist in the directory (e.g. they were excluded), it will *not* delete them.
+#
+# This settings doesn't make sense for some remotes. Leave as None to set
+# automatically
+cleanup_empty_dirsA = None
+cleanup_empty_dirsB = None
 
 ## Rename Tracking
 

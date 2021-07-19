@@ -35,11 +35,11 @@ class SyncRClone:
         # Get file lists
         log('')
         log(f"Refreshing file list on A '{config.remoteA}'")
-        self.currA,self.prevA = self.rclone.file_list(remote='A')   
+        self.currA,self.prevA,emptyA0 = self.rclone.file_list(remote='A')   
         log(utils.file_summary(self.currA))
         
         log(f"Refreshing file list on B '{config.remoteB}'")
-        self.currB,self.prevB = self.rclone.file_list(remote='B')
+        self.currB,self.prevB,emptyB0 = self.rclone.file_list(remote='B')
         log(utils.file_summary(self.currB))
 
         self.check_lock()
@@ -124,23 +124,34 @@ class SyncRClone:
         log('')
         if self.delA or self.backupA or self.movesA or self.transB2A:
             log('Refreshing file list on A')
-            new_listA,_ = self.rclone.file_list(remote='A',prev_list=self.currA0)
+            new_listA,_,emptyA1 = self.rclone.file_list(remote='A',prev_list=self.currA0)
             log(utils.file_summary(new_listA))
             self.rclone.push_file_list(new_listA,remote='A')
         else:
             log('No need to refresh file list on A. Updating current state')
             # We still push this in case new things were hashed
+            emptyA1 = emptyA0
             self.rclone.push_file_list(self.currA0,remote='A')
         
         if self.delB or self.backupB or self.movesB or self.transA2B:
             log('Refreshing file list on B')
-            new_listB,_ = self.rclone.file_list(remote='B',prev_list=self.currB0)
+            new_listB,_,emptyB1 = self.rclone.file_list(remote='B',prev_list=self.currB0)
             log(utils.file_summary(new_listB))
             self.rclone.push_file_list(new_listB,remote='B')
         else:
             log('No need to refresh file list on B. Updating current state')
             # We still push this in case new things were hashed
+            emptyB1 = emptyB0
             self.rclone.push_file_list(self.currB0,remote='B')
+        
+        # Do empty dirs after final state since the state is *just* the files
+        if config.cleanup_empty_dirsA or (config.cleanup_empty_dirsA is None and\
+                                          self.rclone.empty_dir_support('A')): 
+            self.rclone.rmdirs('A',emptyA1 - emptyA0)
+            
+        if config.cleanup_empty_dirsB or (config.cleanup_empty_dirsB is None and\
+                                          self.rclone.empty_dir_support('B')): 
+            self.rclone.rmdirs('B',emptyB1 - emptyB0)
         
         if self.config.set_lock: # There shouldn't be a lock since we didn't set it so save the rclone call
             self.rclone.lock(breaklock=True)

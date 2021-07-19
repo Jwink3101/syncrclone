@@ -2,6 +2,11 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20210719.0.BETA
+
+- Adds support for removing empty directories that were not empty before sync. This way if a directory is moved, the old directory name will not stick around. Note that it does *not* include optimizations for moving whole directories; just files. But makes the end result cleaner.
+    - Default is based on whether the remote even supports empty directories. Also settable.
+
 ## 20210718.0.BETA
 
 - Performs move, deletes, and backups with multiple threads. This setting is *independant* of `--transfers` or `--checkers` in rclone config settings. It is controlled by the new `action_threads` option 

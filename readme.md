@@ -32,15 +32,11 @@ In particular, things I am most uncertain about:
 
 ## Installation and Usage
 
-First, [install rclone](https://rclone.org/install/). Then, you must have python 3.6+ installed. There are many options. I am a fan of [miniconda](https://docs.conda.io/en/latest/miniconda.html).
+First, [install rclone](https://rclone.org/install/). Then, you must have **python 3.6+** installed. There are many options. I am a fan of [miniconda](https://docs.conda.io/en/latest/miniconda.html).
 
 Install syncrclone:
 
     $ python -m pip install git+https://github.com/Jwink3101/syncrclone
-
-or, if you need to specify a specific python version (must be 3.6 or greater), do
-
-    $ python3.6 -m pip install git+https://github.com/Jwink3101/syncrclone
     
 Configure rclone: I prefer to specify a config file using `--config rclone.cfg`. Add the remotes you wish to sync
 

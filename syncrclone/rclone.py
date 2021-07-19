@@ -232,19 +232,30 @@ class Rclone:
         cmd.extend([
             '-R',
             '--no-mimetype', # Not needed so will be faster
-            '--files-only'])
+            ])
         
         cmd.append(remote)
                 
-        files = json.loads(self.call(cmd))
-        debug(f'{AB}: Read {len(files)}')
+        items = json.loads(self.call(cmd))
         
-        for file in files:
-            file.pop('IsDir',None)
-            file.pop('Name',None)
-            file['mtime'] = utils.RFC3339_to_unix(file.pop('ModTime'))
+        folders = [] # Just the folder paths
+        files = []
+        for item in items:
+            item.pop('Name',None)
+            if item.pop('IsDir',False):
+                item.pop('Size',None)
+                item.pop('ModTime',None)
+                folders.append(item)
+                continue
+            
+            item['mtime'] = utils.RFC3339_to_unix(item.pop('ModTime'))
+            files.append(item)
+            
+        empties = get_empty_folders(folders,files)
         
+        # Make them DictTables
         files = DictTable(files,fixed_attributes=['Path','Size','mtime'])
+        debug(f'{AB}: Read {len(files)}')
         
         if not prev_list and {'Path':prev_list_name} in files:
             debug(f'Pulling prev list on {AB}')
@@ -281,7 +292,7 @@ class Rclone:
             files.add_fixed_attribute('inode')
         
         if not compute_hashes or '--hash' in cmd:
-            return files,prev_list
+            return files,prev_list,empties
         
         # update with prev if possible and then get the rest
         not_hashed = []
@@ -323,7 +334,7 @@ class Rclone:
         debug(f'{AB}: Updated hash on {len(updated)} files')
          
 
-        return files,prev_list
+        return files,prev_list,empties
 
     def delete_backup_move(self,remote,dels,backups,moves):
         """
@@ -366,7 +377,6 @@ class Rclone:
         cmd += ['--no-traverse','--no-check-dest','--ignore-times']# + ['--retries','1']  
             
         def do_action(action_file):
-            
             _cmd = cmd.copy() # Make a (thread) local copy
             action,file = action_file
             b = ' (w/ backup)' if action == 'delete' else ''
@@ -492,11 +502,83 @@ class Rclone:
                 self.call(cmd + ['--retries','1',dst],stream=True)
             except subprocess.CalledProcessError:
                 log('No locks to break. Safely ignore rclone error')
+
+    def rmdirs(self,remote,dirlist):
+        """
+        Remove the directories in dirlist. dirlist is sorted so the deepest
+        go first and then they are removed. Note that this is done this way
+        since rclone will not delete if *anything* exists there; even files 
+        we've ignored.
+        """
+        config = self.config
+        AB = remote
+        remote = {'A':config.remoteA,'B':config.remoteB}[remote]
         
+        # Originally, I sorted by length to get the deepest first but I can
+        # actually get the root of them so that I can call rmdirs (with the `s`)
+        # and let that go deep
         
+        rmdirs = []
+        for diritem in sorted(dirlist):
+            # See if it's parent is already there. This can 100% be improved
+            # since the list is sorted. See https://stackoverflow.com/q/7380629/3633154
+            # for example. But it's not worth it here
+            if any(diritem.startswith(f'{rmdir}/') for rmdir in rmdirs):
+                continue # ^^^ Add the / so it gets child dirs only
+            rmdirs.append(diritem)
         
+        cmd = ['rmdirs','-v','--stats-one-line','--log-format','','--retries','1'] 
         
+        def do_action(rmdir):
+            _cmd = cmd + [os.path.join(remote,rmdir)]
+            try:
+                return rmdir,self.call(_cmd,stream=False,logstderr=False)
+            except subprocess.CalledProcessError:
+                # This is likely due to the file not existing. It is acceptable
+                # for this error since even if it was something else, not 
+                # properly removing empty dirs is acceptable
+                return rmdir,'<< could not delete >>'
+            
+        with ThreadPoolExecutor(max_workers=int(config.action_threads)) as exe:
+            for rmdir,res in exe.map(do_action,rmdirs):
+                log(f'rmdirs (if possible) on {AB}: {rmdir}')
+                for line in res.split('\n'):
+                    line = line.strip()
+                    if line: log('rclone:',line) 
+    
+    def empty_dir_support(self,remote):
+        """
+        Return whether or not the remote supports 
         
+        Defaults to True since if it doesn't support them, calling rmdirs
+        will just do nothing
+        """
+        config = self.config
+        AB = remote
+        remote = {'A':config.remoteA,'B':config.remoteB}[remote]
+        
+        features = json.loads(self.call(['backend','features',remote],stream=False))
+        return features.get('Features',{}).get('CanHaveEmptyDirectories',True)
+        
+def get_empty_folders(folders,files):
+    """
+    Returns the empty directories as a subset of folders
+    """
+    # Make a set of all parents
+    parents = set()
+    for file in files:
+        parents.update(all_parents(os.path.dirname(file['Path'])))
+    
+    folders = [folder['Path'] for folder in folders]
+    empty = set(folder for folder in folders if folder not in parents)
+    return empty
+        
+def all_parents(dirpath):
+    """Yield dirpath and all parents of dirpath"""
+    split = dirpath.rsplit(sep='/',maxsplit=1)
+    yield dirpath
+    if len(split) == 2: # Not done
+        yield from all_parents(split[0])
         
         
         
