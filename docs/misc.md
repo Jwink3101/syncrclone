@@ -74,6 +74,8 @@ $ syncrclone --break-lock both <config_file.py>
 * File Listing:
     * If rerun immediately, nothing will happen as everything is in sync
     * If not rerun, files that are later deleted may be be restored upon sync since syncrclone won't know that they previously existed.
+* Delete newly empty dirs (optional)
+    * If it breaks here some empty directories will remain and never be automatically deleted. No data loss but minor cleanup will be required. (can use `rclone rmdirs`)
 
 While this should be safe from any issues, it is suggested that you keep backups! It's even a good idea to run a backup before and after sync if you're really concerned!
 

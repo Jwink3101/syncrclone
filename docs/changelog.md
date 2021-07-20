@@ -2,6 +2,11 @@
 
 This will likely get wiped when I go out of beta. 
 
+## ## 20210720.0.BETA
+
+- Bug Fix related to reusing hashes but not needing more. Missed a return block. Tests updated to catch this
+
+
 ## 20210719.0.BETA
 
 - Adds support for removing empty directories that were not empty before sync. This way if a directory is moved, the old directory name will not stick around. Note that it does *not* include optimizations for moving whole directories; just files. But makes the end result cleaner.

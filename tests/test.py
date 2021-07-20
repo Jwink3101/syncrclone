@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Tests!
 """
@@ -357,11 +358,15 @@ def test_reuse_hash():
     test.write_post('B/fileB1.txt','B1')
     
     print('-='*40);print('=-'*40)
-    test.sync(['--debug'])
+    test.sync(['--debug']) # Must debug to query for the msg of calling for me
     stdout = ''.join(test.synclogs[-1])
     
     assert "A: Updated 1. Fetching hashes for 1" in stdout
     assert "B: Updated 1. Fetching hashes for 1" not in stdout
+    
+    # Do one more test to cover the code path of not needing to get more hashes
+    # such as if nothing changed from the last sync
+    test.sync()    
 
     os.chdir(PWD0)
 
@@ -981,7 +986,7 @@ def test_emptydir(emptyA,emptyB):
 
 
 if __name__ == '__main__':
-    #test_main('A','hash','B','hash','mtime') # Vanilla test covered below
+    test_main('A','hash','B','hash','mtime') # Vanilla test covered below
    
 #     test_main('A','inode','cryptB:','mtime','mtime')
 #     test_main('cryptA:','size','cryptB:','mtime','mtime')

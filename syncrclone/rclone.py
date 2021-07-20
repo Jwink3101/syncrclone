@@ -307,7 +307,7 @@ class Rclone:
         
         if len(not_hashed) == 0:
             debug(f'{AB}: Updated {updated}. No need to fetch more')
-            return files,prev_list
+            return files,prev_list,empties
         debug(f'{AB}: Updated {updated}. Fetching hashes for {len(not_hashed)}')
         
         tmpfile = self.tmpdir + f'/{AB}_update_hash'
