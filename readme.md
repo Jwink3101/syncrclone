@@ -91,6 +91,10 @@ $ syncrclone   # Will automatically find it
 $ syncrclone ../../../.syncrclone/config.py 
 ```
 
+### rclone Versions
+
+This tool uses some newer rclone flags so it is always good to make sure you're using the newest rclone. There is a small chance that an rclone change could break something so you *may* have to use a previous version until it is updated.
+
 ## Filtering, etc
 
 All filtering is handled by rclone's filtering. See their [detailed documentation](https://rclone.org/filtering/).

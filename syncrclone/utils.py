@@ -57,27 +57,42 @@ def add_hash_compare_attribute(*filelists):
         DictTable filelists
       
     """
-    # Two loops through but still O(N)
-    hashnames = set()
-    for filelist in filelists:
+    # In rclone 1.56, the hash names were changed. This is an optional mapping to
+    # to keep them together. It does has a slight performance penalty so I will
+    # eventually remove this
+    mappings = { 
+       # old            :new
+        'MD5'           :'md5',
+        'SHA-1'         :'sha1',
+        'Whirlpool'     :'whirlpool',
+        'CRC-32'        :'crc32',
+        'DropboxHash'   :'dropbox',
+        'MailruHash'    :'mailru',
+        'QuickXorHash'  :'quickxor',
+    }
+
+    hashes_all = [set() for _ in filelists]
+    for filelist,hashes in zip(filelists,hashes_all):
+        # Loop through each file in case some files are missing some hashes
         for file in filelist:
-            for hashname in file.get('Hashes',{}).keys():
-                hashnames.add(hashname)
-    
-    for hashname in ['SHA-1','MD5','Whirlpool','CRC-32','DropboxHash','MailruHash','QuickXorHash']:
-        if hashname in hashnames:
-            common_hash = hashname
-            break
-    else:
+            hashes.update({mappings.get(h,h) for h in file.get('Hashes',{})})
+
+    common = set().union(*hashes_all)
+    priority = ['sha1', 'md5', 'crc32', 'whirlpool', 'dropbox', 'mailru', 'quickxor']
+    common = sorted(common,key=lambda h: priority.index(h) if h in priority else 999)
+
+    try:
+        common = common[0]
+    except IndexError:
         raise ValueError('Could not find common hash')
-        
+
     for filelist in filelists:
         for file in filelist:
-            hashval = file.get('Hashes',{}).get(common_hash,None)
+            hashval = file.get('Hashes',{}).get(common,None)
             if hashval:
                 file['common_hash'] = hashval
-        
-        filelist.add_fixed_attribute('common_hash',force=False) # Will cause it to reindex. Force stops it from mattering if it is dynamic
+        filelist.add_fixed_attribute('common_hash')
+
     
 def bytes2human(byte_count,base=1024,short=True):
     """

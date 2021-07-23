@@ -39,10 +39,6 @@ class Rclone:
         
         self.validate()
         
-#         self.backup_path = {
-#             f'{AB}':os.path.join(getattr(config,f'remote{AB}'),
-#                                  '.syncrclone','backups',f'{AB}_{config.now}')
-#                             for AB in 'AB'}
         self.backup_path0 = {
             f'{AB}':f'.syncrclone/backups/{config.now}_{self.config.name}_{AB}' 
                                                                  for AB in 'AB'}
@@ -61,7 +57,7 @@ class Rclone:
                 if v in FILTER_FLAGS:
                     raise ConfigError(f"'{attr}' cannot have '{v}' or any other filtering flags")
         
-    def call(self,cmd,stream=False,logstderr=True):
+    def call(self,cmd,stream=False,logstderr=True,display_error=True):
         """
         Call rclone. If streaming, will write stdout & stderr to
         log. If logstderr, will always send stderr to log (default)
@@ -106,7 +102,7 @@ class Rclone:
                     log('rclone:',line)
                     out.append(line)
             out = '\n'.join(out)
-            err = ''
+            err = '' # Piped to stderr
         
         proc.wait()
         
@@ -121,6 +117,14 @@ class Rclone:
                 log(' rclone stderr:',err)
         
         if proc.returncode:
+            if display_error:
+                log('RCLONE ERROR')
+                log('CMD',cmd)
+                if stream:
+                    log('STDOUT and STDERR',out)
+                else:
+                    log('STDOUT',out.strip())
+                    log('STDERR',err.strip())
             raise subprocess.CalledProcessError(proc.returncode,cmd,output=out,stderr=err)
         if not logstderr:
             out = out + '\n' + err
@@ -374,7 +378,8 @@ class Rclone:
         # no need to check the destination since we know it's (empty) state.
         # The docs suggest --retries 1 but we are *only* done a single file
         # at a time so we want it to retry on all files
-        cmd += ['--no-traverse','--no-check-dest','--ignore-times']# + ['--retries','1']  
+        cmd += ['--no-traverse','--no-check-dest','--ignore-times']
+        cmd += ['--retries','4'] # ['--retries','1']  
             
         def do_action(action_file):
             _cmd = cmd.copy() # Make a (thread) local copy
@@ -499,7 +504,7 @@ class Rclone:
             cmd[0] = 'delete'
             dst = os.path.join(remote,f'.syncrclone/LOCK/')
             try:
-                self.call(cmd + ['--retries','1',dst],stream=True)
+                self.call(cmd + ['--retries','1',dst],stream=True,display_error=False)
             except subprocess.CalledProcessError:
                 log('No locks to break. Safely ignore rclone error')
 

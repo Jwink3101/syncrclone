@@ -2,7 +2,12 @@
 
 This will likely get wiped when I go out of beta. 
 
-## ## 20210720.0.BETA
+## 20210723.0.BETA
+
+- Fixes hash-based move tracking for rclone 1.56 which changed the hash names. Not only is it fixed but it is now more robust to this happening again. Will also map old names to new ones
+- 
+
+## 20210720.0.BETA
 
 - Bug Fix related to reusing hashes but not needing more. Missed a return block. Tests updated to catch this
 
