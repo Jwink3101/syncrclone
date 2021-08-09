@@ -360,7 +360,7 @@ class SyncRClone:
                 mA,mB = sA,sB # Reset m(AB) to s(AB)
             
             if not mA or not mB: # Either never set for non-mtime compare or no mtime listed
-                warning.warn('No mtime found. Resorting to size')
+                warnings.warn('No mtime found. Resorting to size')
                 mA,mB = sA,sB # Reset m(AB) to s(AB)
                 
             log(f"CONFLICT '{path}'")
