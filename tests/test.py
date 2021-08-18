@@ -83,8 +83,7 @@ def test_main(remoteA,renamesA,
     test.config.compare = compare
     test.config.conflict_mode = 'newer_tag' # Deprecated. Update in the future
     
-    test.config.log_dest = 'logs/'
-    
+    test.config.log_dest = 'logs/'    
     test.write_config()
     
     ## Initial files
@@ -984,9 +983,63 @@ def test_emptydir(emptyA,emptyB):
     
     os.chdir(PWD0)
 
+@pytest.mark.parametrize("always,compare,renamesA,renamesB,conflict_mode",itertools.product([True,False],
+                                                                                            ['mtime','size'],
+                                                                                            ['mtime',None],
+                                                                                            ['mtime',None],
+                                                                                            ['newer','larger']))
+def test_no_modtime(always,compare,renamesA,renamesB,conflict_mode):
+    remoteA = 'A'
+    remoteB = 'B'
+    set_debug(False)   
+    
+    test = testutils.Tester('nomodtime',remoteA,remoteB)   
+    
+    test.config.name = 'mmm' # so that it isn't random
+    test.config.always_get_mtime = always
+    test.config.compare = compare
+    test.config.renamesA = renamesA
+    test.config.renamesB = renamesB
+    test.config.conflict_mode = conflict_mode
+    
+    test.write_config()
+    
+    test.write_pre('A/fileA.txt','A')
+    test.write_pre('A/fileB.txt','B')
+    test.write_pre('A/fileMod.txt','AB')
+    
+    
+    test.setup()
+    
+    test.write_post('A/fileMod.txt','AAA',add_dt=50) # newer and larger
+    test.write_post('B/fileMod.txt','BB',add_dt=0) #
+    
+    # We do not actually care if it follows the moves or not. Just whether
+    # it gets the mtime to try to do it. Move the file so it has to try
+    test.move('A/fileA.txt','A/fileAA.txt')
+    test.move('A/fileB.txt','A/fileBB.txt')
+    
+    test.sync()
+    
+    # Compare to make sure the sync worked
+    assert not test.compare_tree()
+    assert exists('A/fileAA.txt')
+    assert not exists('A/fileA.txt')
+    assert test.read('A/fileMod.txt') == 'AAA'
+    
+    # Now check the file listings to see if they have mtime stored
+    with lzma.open('A/.syncrclone/A-mmm_fl.json.xz') as fA, lzma.open('B/.syncrclone/B-mmm_fl.json.xz') as fB:
+        filesA,filesB = json.load(fA),json.load(fB)
+    mtimeA = all(f['mtime'] for f in filesA)
+    mtimeB = all(f['mtime'] for f in filesB)
+    
+    assert mtimeA == (always or compare == 'mtime' or renamesA == 'mtime' or conflict_mode == 'newer')
+    assert mtimeB == (always or compare == 'mtime' or renamesB == 'mtime' or conflict_mode == 'newer')
+        
+    os.chdir(PWD0)
 
 if __name__ == '__main__':
-    test_main('A','hash','B','hash','mtime') # Vanilla test covered below
+    test_main('A','mtime','B','hash','size') # Vanilla test covered below
    
 #     test_main('A','inode','cryptB:','mtime','mtime')
 #     test_main('cryptA:','size','cryptB:','mtime','mtime')
@@ -1013,8 +1066,15 @@ if __name__ == '__main__':
 #         test_legacy_filelist(legA,legB)
 #     for emptyA,emptyB in itertools.product([True,False,None],[True,False,None]):    
 #         test_emptydir(emptyA,emptyB) 
-
-
+#     for always,compare,renamesA,renamesB,conflict_mode in itertools.product([True,False],
+#                                                                             ['mtime','size'],
+#                                                                             ['mtime',None],
+#                                                                             ['mtime',None],
+#                                                                             ['newer','larger']):
+#         
+#         test_no_modtime(always,compare,renamesA,renamesB,conflict_mode)
+        
+        
     # hacked together parser. This is used to manually test whether the interactive
     # mode is working
     if len(sys.argv) > 1 and sys.argv[1] == '-i':

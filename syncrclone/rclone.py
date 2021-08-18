@@ -226,6 +226,12 @@ class Rclone:
         
         if compute_hashes and not reuse:
             cmd.append('--hash')
+
+        if not config.always_get_mtime and \
+           not (config.compare == 'mtime' or
+                getattr(config,f'renames{AB}') == 'mtime' or
+                config.conflict_mode in ('newer','older')):
+            cmd.append('--no-modtime')
         
         # Now that my above filters, add user flags
         cmd += config.rclone_flags \
@@ -252,7 +258,8 @@ class Rclone:
                 folders.append(item)
                 continue
             
-            item['mtime'] = utils.RFC3339_to_unix(item.pop('ModTime'))
+            mtime = item.pop('ModTime')
+            item['mtime'] = utils.RFC3339_to_unix(mtime) if mtime else None
             files.append(item)
             
         empties = get_empty_folders(folders,files)
@@ -356,22 +363,19 @@ class Rclone:
         
         
         actions = [('backup',file) for file in backups] + \
-                  [('move',file) for file in moves] + \
-                  [('delete',file) for file in dels]
-
-#       # There used to be an optimization to do deletes with backup in a more
-#       # streamlined way but for the sake of simplicity and since it is now
-#       # threaded, this codepath is removed            
-#       if dels and not config.backup: # This is the only one optimized
-#           # Can be done in one call.
-#           tmpfile = self.tmpdir + f'{AB}_del'
-#           with open(tmpfile,'wt') as file:
-#               file.write('\n'.join(files))
-#           cmd += ['--files-from',tmpfile,remote]
-#           cmd[0] = 'delete'
-#           self.call(cmd,stream=True)
-#       else:
-#           actions.extend([('delete',file) for file in dels])
+                  [('move',file) for file in moves]
+                  
+        # If and only if this is the case, it can be sped up as done below. This
+        # make it all a single rclone call and lets rclone handle the details
+        if dels and not config.backup: # This is the only one optimized
+            tmpfile = self.tmpdir + f'{AB}_del'
+            with open(tmpfile,'wt') as file:
+                file.write('\n'.join(dels))
+            cmd += ['--files-from',tmpfile,remote]
+            cmd[0] = 'delete'
+            self.call(cmd,stream=True)
+        else:
+            actions.extend([('delete',file) for file in dels])
 
         # Moves have to iterated to not overlap. Also, do not need to list
         # the final dest so --no-traverse. Also add --no-check-dest since

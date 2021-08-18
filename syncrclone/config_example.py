@@ -118,6 +118,12 @@ tag_conflict = False
 reuse_hashesA = False
 reuse_hashesB = False
 
+# Some remotes (e.g. S3) require an additional API call to get modtimes. If you
+# are comparing with 'size' of 'hash', you can forgo this API call by setting
+# this to False. Future versions may be smart about this and allow for 
+# server-side modtime with a cache but that is not yet possible.
+always_get_mtime = True 
+
 # When backups are set, all overwrites or deletes will instead be backed up.
 # The only reason this should be disabled is if you plan to use some backup
 # built into BOTH remotes
@@ -148,7 +154,8 @@ set_lock = False
 # (e.g. ['--transfers','10'], delete, copy, and move actions all happen with
 # their own call to rclone. This happens in threads to speed it up. This can
 # be toggled. 
-action_threads = __CPU_COUNT__ // 1.5
+action_threads = 1 # Some remotes do not like concurrent rclone calls so this is the default
+# action_threads = __CPU_COUNT__ // 1.5
 # action_threads = 4
 
 # syncrclone does not transfer empty directories however if a directory is

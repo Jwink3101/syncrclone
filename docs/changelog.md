@@ -2,10 +2,14 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20210818.0.BETA
+
+- Adds `always_get_mtime` (default `True`) option so that for remotes such as S3 that require extra API calls for ModTime, can skip it if not needed (i.e. not used for comparison, tracking, or conflict resolution)
+
 ## 20210723.0.BETA
 
 - Fixes hash-based move tracking for rclone 1.56 which changed the hash names. Not only is it fixed but it is now more robust to this happening again. Will also map old names to new ones
-- 
+
 
 ## 20210720.0.BETA
 
