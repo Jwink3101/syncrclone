@@ -14,7 +14,7 @@ In particular, things I am most uncertain about:
 * Automated runs and locks. I've tested the locking but not with constantly running (e.g. via crontab) and dealing with it
 * Clarity of the setup docs. This is hard for me to judge as I wrote it so I know what to expect. Is local mode clear?
 * Missing features?
-    * What is in scope and should be included? One thing I didn't port over from [PyFiSync](https://github.com/Jwink3101/PyFiSync) was syncrclone being able to execute shell commands pre and post (pre can be done via the config script but not post)
+    * What is in scope and should be included?
     * When to use `rclone_flags{A/B}`. Currently just listing and one-sides local-to-remote copies (e.g. file lists, non-transfer-actions, and logs). What about remote-to-remote?
 
 

@@ -568,7 +568,32 @@ class Rclone:
         
         features = json.loads(self.call(['backend','features',remote],stream=False))
         return features.get('Features',{}).get('CanHaveEmptyDirectories',True)
+    
+    def run_shell(self,pre=None):
+        """Run the shell commands"""
+        cmds = self.config.pre_sync_shell if pre else self.config.post_sync_shell
+        if not cmds.strip():
+            return
+        log('')
+        log('Running shell commands')
+        prefix = f'{"DRY RUN " if self.config.dry_run else ""}$'
+        for line in cmds.split('\n'):
+            log(f'{prefix} {line}')
         
+        if self.config.dry_run:
+            return log('NOT RUNNING')
+        proc = subprocess.Popen(cmds,
+                                shell=True,
+                                stderr=subprocess.PIPE,
+                                stdout=subprocess.PIPE)
+        out,err = proc.communicate()
+        for line in out.decode().split('\n'):
+            log(f'STDOUT: {line}')
+        for line in err.decode().split('\n'):
+            log(f'STDERR: {line}')
+        
+            
+    
 def get_empty_folders(folders,files):
     """
     Returns the empty directories as a subset of folders

@@ -8,6 +8,7 @@ import shutil
 import glob
 import time
 import warnings
+import re
 import zlib,lzma,json
 
 import testutils
@@ -834,6 +835,7 @@ def test_and_demo_exclude_if_present():
 
 
 version_tests = ['20200826.0.BETA',None]
+
 @pytest.mark.parametrize("version",version_tests)
 def test_version_warning(version):
     """
@@ -1038,8 +1040,47 @@ def test_no_modtime(always,compare,renamesA,renamesB,conflict_mode):
         
     os.chdir(PWD0)
 
+@pytest.mark.parametrize("dry",[True,False])
+def test_prepost_script(dry):
+    remoteA = 'A'
+    remoteB = 'B'
+    set_debug(False)   
+    
+    test = testutils.Tester('prepost_script',remoteA,remoteB)   
+    test.config.pre_sync_shell  = """\
+        myvarPRE=pre-test
+        echo pretest $myvarPRE""" 
+    test.config.post_sync_shell  = """\
+        myvarPOST=post-test
+        echo posttest $myvarPOST""" 
+
+    test.write_config()
+    
+    test.write_pre('A/fileA.txt','A')
+    if dry:
+        test.setup(flags=['--dry-run'])
+    else: 
+        test.setup()
+    
+    log = ''.join(test.synclogs[-1]) 
+    assert '$         myvarPRE=pre-test' in log
+    assert '$         echo pretest $myvarPRE' in log
+    assert '$         myvarPOST=post-test' in log
+    assert '$         echo posttest $myvarPOST' in log
+        
+    if dry:
+        assert 'STDOUT: pretest pre-test' not in log
+        assert 'STDOUT: posttest post-test' not in log
+    else:
+        assert 'STDOUT: pretest pre-test' in log
+        assert 'STDOUT: posttest post-test' in log     
+        
+    
+    os.chdir(PWD0)
+
+
 if __name__ == '__main__':
-    test_main('A','mtime','B','hash','size') # Vanilla test covered below
+#     test_main('A','mtime','B','hash','size') # Vanilla test covered below
    
 #     test_main('A','inode','cryptB:','mtime','mtime')
 #     test_main('cryptA:','size','cryptB:','mtime','mtime')
@@ -1073,7 +1114,8 @@ if __name__ == '__main__':
 #                                                                             ['newer','larger']):
 #         
 #         test_no_modtime(always,compare,renamesA,renamesB,conflict_mode)
-        
+#     test_prepost_script(False)
+#     test_prepost_script(True)
         
     # hacked together parser. This is used to manually test whether the interactive
     # mode is working

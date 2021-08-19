@@ -2,6 +2,10 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20210819.0.BETA
+
+- Adds `pre_sync_shell` and `post_sync_shell` options. Tests.
+
 ## 20210818.0.BETA
 
 - Adds `always_get_mtime` (default `True`) option so that for remotes such as S3 that require extra API calls for ModTime, can skip it if not needed (i.e. not used for comparison, tracking, or conflict resolution)

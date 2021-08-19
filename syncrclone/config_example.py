@@ -201,6 +201,13 @@ renamesB = None
 log_dest = '.syncrclone/logs' # Relative to root of each remote
 local_log_dest = ''
 
+## Pre- and Post-run
+# Specify shell code to be evaluated before or after running syncrclone. Note
+# these are all run from the directory of this config (as with everything else).
+# STDOUT and STDERR will be captured. Note that there is no validation or 
+# security of the inputs. These are not actually called if using dry-run.
+pre_sync_shell = ""
+post_sync_shell = ""
 
 
 

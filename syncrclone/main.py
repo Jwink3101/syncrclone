@@ -24,6 +24,8 @@ class SyncRClone:
         self.config = config
         self.config.now = self.now # Set it there to be used elsewhere
         self.rclone = Rclone(self.config)
+        
+        self.rclone.run_shell(pre=True)
 
         if break_lock:
             if self.config.dry_run:
@@ -72,6 +74,7 @@ class SyncRClone:
         
         if config.dry_run:
             self.summarize(dry=True)
+            self.rclone.run_shell(pre=False)
             self.dump_logs()
             return
         
@@ -82,6 +85,7 @@ class SyncRClone:
             # select.select, will preclude (eventual?) windows support
             cont = input('Would you like to continue? Y/[N]: ')
             if not cont.lower().startswith('y'):
+                self.rclone.run_shell(pre=False)
                 sys.exit()
         else:
             self.summarize(dry=False)  
@@ -155,8 +159,10 @@ class SyncRClone:
         
         if self.config.set_lock: # There shouldn't be a lock since we didn't set it so save the rclone call
             self.rclone.lock(breaklock=True)
-            
+
+        self.rclone.run_shell(pre=False)            
         self.dump_logs()
+
     
     def dump_logs(self):
         if not self.config.local_log_dest and not self.config.log_dest:
