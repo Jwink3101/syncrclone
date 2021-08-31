@@ -3,8 +3,8 @@ Most of the rclone interfacing
 """
 import json
 import os
-from collections import deque
-import subprocess
+from collections import deque,defaultdict
+import subprocess,shlex
 import lzma
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
@@ -43,7 +43,7 @@ class Rclone:
             f'{AB}':f'.syncrclone/backups/{config.now}_{self.config.name}_{AB}' 
                                                                  for AB in 'AB'}
         self.backup_path = {
-            f'{AB}':os.path.join(getattr(config,f'remote{AB}'),self.backup_path0[AB])
+            f'{AB}':pathjoin(getattr(config,f'remote{AB}'),self.backup_path0[AB])
                                                                  for AB in 'AB'}
         
         log('rclone version:')
@@ -135,7 +135,7 @@ class Rclone:
         AB = remote
         remote = {'A':config.remoteA,'B':config.remoteB}[remote]
         
-        dst = os.path.join(remote,'.syncrclone',f'{AB}-{self.config.name}_fl.json.xz')
+        dst = pathjoin(remote,'.syncrclone',f'{AB}-{self.config.name}_fl.json.xz')
         src = os.path.join(self.tmpdir,f'{AB}_curr')
         mkdir(src,isdir=False)
         
@@ -155,7 +155,7 @@ class Rclone:
         AB = remote
         remote = {'A':config.remoteA,'B':config.remoteB}[remote]
         
-        src = os.path.join(remote,'.syncrclone',f'{AB}-{self.config.name}_fl.json.xz')
+        src = pathjoin(remote,'.syncrclone',f'{AB}-{self.config.name}_fl.json.xz')
         dst = os.path.join(self.tmpdir,f'{AB}_prev')
         mkdir(dst,isdir=False)
         
@@ -175,7 +175,7 @@ class Rclone:
         AB = remote
         remote = {'A':config.remoteA,'B':config.remoteB}[remote]
         
-        src = os.path.join(remote,'.syncrclone',f'{AB}-{self.config.name}_fl.zipjson')
+        src = pathjoin(remote,'.syncrclone',f'{AB}-{self.config.name}_fl.zipjson')
         dst = os.path.join(self.tmpdir,f'{AB}_prev')
         mkdir(dst,isdir=False)
         
@@ -216,8 +216,8 @@ class Rclone:
         
         # build the command including initial filters *before* any filters set
         # by the user
-        prev_list_name = os.path.join('.syncrclone',f'{AB}-{self.config.name}_fl.json.xz')
-        prev_list_nameLEGACY = os.path.join('.syncrclone',f'{AB}-{self.config.name}_fl.zipjson')
+        prev_list_name = pathjoin('.syncrclone',f'{AB}-{self.config.name}_fl.json.xz')
+        prev_list_nameLEGACY = pathjoin('.syncrclone',f'{AB}-{self.config.name}_fl.zipjson')
         cmd = ['lsjson',
                '--filter',f'+ /{prev_list_name}', # All of syncrclone's filters come first and include before exclude
                '--filter',f'+ /{prev_list_nameLEGACY}', 
@@ -352,74 +352,171 @@ class Rclone:
         Perform deletes, backups and moves. Same basic codes but with different
         reporting. If moves, files are (src,dest) tuples.
         """
-
+        ## Optimization Notes
+        # 
+        # rclone is faster if you can do many actions at once. For example, to delete
+        # files, it is faster to do `delete --files-from <list-of-files>`. However, for
+        # moves, you cannot have overlapping remotes. We therefore have a few different
+        # optimizations.
+        #
+        # NOTE: The order here is important!
+        #   
+        #     Delete w/ backup: Depends on the remote.
+        #       If the remote supports moves:
+        #           Optimize at the root subdir level so that we do not overlap with .syncrclone 
+        #           but can otherwise use `move --files-from`
+        #           
+        #           The rootlevel ones will have to be a vanilla move. Add them          
+        #
+        #       If the remote does not support moves: (i.e. it will internally 
+        #       use copy+delete)
+        #           Add the files to backup, run that first, and then delete w/o backup
+        #
+        #     Moves: No optimizations. One call for every file. :-( 
+        #
+        #     Backups:
+        #       Use the `copy --files-from`
+        #    
+        #     Delete w/o backup
+        #       Use `delete --files-from`
+        #
+        # References:
+        #  
+        # https://github.com/rclone/rclone/issues/1319
+        #   Explains the issue with the quote:
+        #
+        #   > For a remote which doesn't it has to move each individual file which might 
+        #   > fail and need a retry which is where the trouble starts...
+        #
+        # https://github.com/rclone/rclone/issues/1082
+        #   Tracking issue. Also references https://forum.rclone.org/t/moving-the-contents-of-a-folder-to-the-root-directory/914/7
+        #   
         config = self.config
         AB = remote
         remote = {'A':config.remoteA,'B':config.remoteB}[remote]
         
-        cmd =  [''] # Will get set later
-        cmd += ['-v','--stats-one-line','--log-format','']
-        cmd += config.rclone_flags + self.add_args + getattr(config,f'rclone_flags{AB}')
+        cmd0 =  [None] # Will get set later
+        cmd0 += ['-v','--stats-one-line','--log-format','']
+        # We know in all cases, the dest doesn't exists. For backups, it's totally new and
+        # for moves, if it existed, it wouldn't show as a move. So never check dest
+        cmd0 += ['--no-check-dest']
+        cmd0 += ['--retries','4'] # Extra safe.
+        cmd0 += config.rclone_flags + self.add_args + getattr(config,f'rclone_flags{AB}')
         
+        backups = backups.copy() # Will be appended so make a new copy
         
-        actions = [('backup',file) for file in backups] + \
-                  [('move',file) for file in moves]
-                  
-        # If and only if this is the case, it can be sped up as done below. This
-        # make it all a single rclone call and lets rclone handle the details
-        if dels and not config.backup: # This is the only one optimized
-            tmpfile = self.tmpdir + f'{AB}_del'
-            with open(tmpfile,'wt') as file:
-                file.write('\n'.join(dels))
-            cmd += ['--files-from',tmpfile,remote]
-            cmd[0] = 'delete'
-            self.call(cmd,stream=True)
+        if config.backup:
+            dels_back = dels
+            dels_noback = []
         else:
-            actions.extend([('delete',file) for file in dels])
-
-        # Moves have to iterated to not overlap. Also, do not need to list
-        # the final dest so --no-traverse. Also add --no-check-dest since
-        # no need to check the destination since we know it's (empty) state.
-        # The docs suggest --retries 1 but we are *only* done a single file
-        # at a time so we want it to retry on all files
-        cmd += ['--no-traverse','--no-check-dest','--ignore-times']
-        cmd += ['--retries','4'] # ['--retries','1']  
+            dels_back = []
+            dels_noback = dels
+        
+        
+        debug(AB,'dels_back',dels_back)
+        debug(AB,'dels_noback',dels_noback)
+        debug(AB,'moves',moves)
+    
+        ## Delete with backups
+        def _move_del(root_files):
+            root,files = root_files
+            cmd = cmd0.copy()
+            cmd[0] = 'move'
             
-        def do_action(action_file):
-            _cmd = cmd.copy() # Make a (thread) local copy
-            action,file = action_file
-            b = ' (w/ backup)' if action == 'delete' else ''
+            tmpfile = self.tmpdir + f'/{AB}_movedel_{utils.random_str()}' 
+            with open(tmpfile,'wt') as file:
+                file.write('\n'.join(files))
             
-            if action in ['delete','backup']:
-                src = os.path.join(remote,file)
-                dest = os.path.join(self.backup_path[AB],file)
-                t = f"{action}{b} {AB}: '{file}'"
-            else:
-                src = os.path.join(remote,file[0])
-                dest = os.path.join(remote,file[1])
-                t = f"move {AB}: '{file[0]}' --> '{file[1]}'"
-            srcdest = [src,dest]
+            src = pathjoin(remote,root)
+            dst = pathjoin(self.backup_path[AB],root)
             
-            ### FIX HERE
-            if action == 'move' or (action == 'delete' and config.backup):
-                _cmd[0] = 'moveto' # non-backup deletes are in the original conditional
-            elif action == 'delete' and not config.backup:
-                _cmd[0] = 'delete'
-                del srcdest[-1] # remove the dest
-            else: # backup
-                # Keep the original. Doesn't really matter with rclone 
-                # since it always transfers the whole file but this way
-                # it just shows as overwrite, not delete and new if the
-                # remote cares
-                _cmd[0] = 'copyto' 
-                
-            return self.call(_cmd + srcdest,stream=False,logstderr=False)
+            cmd += ['--files-from',tmpfile,src,dst]
             
+            return '',self.call(cmd,stream=False,logstderr=False)
+        
+        if self.move_support(AB) and dels_back:
+            rootdirs = defaultdict(list)
+            for file in dels_back:
+                dirpath,fname = os.path.split(file)
+                dirsplit = dirpath.split('/')
+                root = dirsplit[0]
+                ff = os.path.join(*(list(dirsplit[1:]) + [fname]))
+                rootdirs[root].append(ff)
+            debug(f'rootdirs prior {AB}',dict(rootdirs))
+            
+            # Handle the root ones
+            for file in rootdirs.pop('',[]):
+                new = (file,os.path.join(self.backup_path0[AB],file))
+                moves.append(new)
+                debug('root-level backup as move',new)
+            
+            debug(f'rootdirs post {AB}',dict(rootdirs))
+            
+            with ThreadPoolExecutor(max_workers=int(config.action_threads)) as exe:
+                for action,res in exe.map(_move_del,rootdirs.items()):
+                    log(action)
+                    for line in res.split('\n'):
+                        line = line.strip()
+                        if line: log('rclone:',line)
+        elif dels_back: # Actually, could just use else here but I want to see in cov if its hit
+            # Add to backup and delete without backup
+            debug('Add to backup + delete',AB,dels_back)
+            backups.extend(dels_back)
+            dels_noback.extend(dels_back)
+            
+    
+        ## Moves
+        def _move(file):
+            t = f'Move {shlex.quote(file[0])} --> {shlex.quote(file[1])}'
+            src = pathjoin(remote,file[0])
+            dst = pathjoin(remote,file[1])
+        
+            cmd = cmd0.copy()
+            cmd[0] = 'moveto'
+            cmd += [src,dst]
+            return t,self.call(cmd,stream=False,logstderr=False)
         with ThreadPoolExecutor(max_workers=int(config.action_threads)) as exe:
-            for res in exe.map(do_action,actions):
+            for action,res in exe.map(_move,moves):
+                log(action)
                 for line in res.split('\n'):
                     line = line.strip()
                     if line: log('rclone:',line) 
+    
+            
+        ## Backups
+        if backups:
+            cmd = cmd0.copy()
+            cmd[0] = 'copy'
+            
+            # we know the dest does not exists so speed it up
+            cmd += ['--no-traverse','--no-check-dest','--ignore-times']
+            cmd += ['--retries','4'] # Extra safe
+            
+            tmpfile = self.tmpdir + f'/{AB}_movedel_{utils.random_str()}' 
+            with open(tmpfile,'wt') as file:
+                file.write('\n'.join(backups))
+            
+            src = remote
+            dst = self.backup_path[AB]
+            
+            cmd += ['--files-from',tmpfile,src,dst]
+            debug('backing up',backups)
+            for line in self.call(cmd,stream=False,logstderr=False).split('\n'):
+                line = line.strip()
+                if line: log('rclone:',line)
+            
+        ## Deletes w/o backup
+        if dels_noback:
+            tmpfile = self.tmpdir + f'/{AB}_del'
+            with open(tmpfile,'wt') as file:
+                file.write('\n'.join(dels))
+            cmd = cmd0.copy()
+            cmd += ['--files-from',tmpfile,remote]
+            cmd[0] = 'delete'
+            log('deleting')
+            for line in self.call(cmd,stream=False,logstderr=False).split('\n'):
+                line = line.strip()
+                if line: log('rclone:',line)
     
     def transfer(self,mode,files):
         config = self.config
@@ -460,7 +557,7 @@ class Rclone:
         AB = remote
         remote = {'A':config.remoteA,'B':config.remoteB}[remote]
         
-        dst = os.path.join(remote,dst)
+        dst = pathjoin(remote,dst)
         
         cmd = ['copyto']
         cmd += ['-v','--stats-one-line','--log-format','']
@@ -496,17 +593,17 @@ class Rclone:
             log(f'Setting lock on {AB}')
             cmd[0] = 'copyto'
 
-            lockfile = os.path.join(self.tmpdir,f'LOCK_{config.name}')
+            lockfile = pathjoin(self.tmpdir,f'LOCK_{config.name}')
             with open(lockfile,'wt') as F:
                 F.write(config.now)
         
-            dst = os.path.join(remote,f'.syncrclone/LOCK/LOCK_{config.name}')
+            dst = pathjoin(remote,f'.syncrclone/LOCK/LOCK_{config.name}')
 
             self.call(cmd + [lockfile,dst],stream=True)
         else:
             log(f'Breaking locks on {AB}. May return errors if {AB} is not locked')
             cmd[0] = 'delete'
-            dst = os.path.join(remote,f'.syncrclone/LOCK/')
+            dst = pathjoin(remote,f'.syncrclone/LOCK/')
             try:
                 self.call(cmd + ['--retries','1',dst],stream=True,display_error=False)
             except subprocess.CalledProcessError:
@@ -539,7 +636,7 @@ class Rclone:
         cmd = ['rmdirs','-v','--stats-one-line','--log-format','','--retries','1'] 
         
         def do_action(rmdir):
-            _cmd = cmd + [os.path.join(remote,rmdir)]
+            _cmd = cmd + [pathjoin(remote,rmdir)]
             try:
                 return rmdir,self.call(_cmd,stream=False,logstderr=False)
             except subprocess.CalledProcessError:
@@ -555,6 +652,22 @@ class Rclone:
                     line = line.strip()
                     if line: log('rclone:',line) 
     
+    def move_support(self,remote):
+        """
+        Return whether or not the remote supports 
+        
+        Defaults to True since if it doesn't support them, calling rmdirs
+        will just do nothing
+        """
+        config = self.config
+        AB = remote
+        remote = {'A':config.remoteA,'B':config.remoteB}[remote]
+        features = json.loads(self.call(['backend','features',remote] \
+                                        + config.rclone_flags \
+                                        + getattr(config,f'rclone_flags{AB}'),stream=False))
+        return features.get('Features',{}).get('Move',True)
+        
+    
     def empty_dir_support(self,remote):
         """
         Return whether or not the remote supports 
@@ -565,8 +678,9 @@ class Rclone:
         config = self.config
         AB = remote
         remote = {'A':config.remoteA,'B':config.remoteB}[remote]
-        
-        features = json.loads(self.call(['backend','features',remote],stream=False))
+        features = json.loads(self.call(['backend','features',remote] \
+                                        + config.rclone_flags \
+                                        + getattr(config,f'rclone_flags{AB}'),stream=False))
         return features.get('Features',{}).get('CanHaveEmptyDirectories',True)
     
     def run_shell(self,pre=None):
@@ -615,7 +729,30 @@ def all_parents(dirpath):
         yield from all_parents(split[0])
         
         
-        
+
+def pathjoin(*args):
+    """
+    This is like os.path.join but does some rclone-specific things because there could be
+    a ':' in the first part.
+    
+    The second argument could be '/file', or 'file' and the first could have a colon.
+        pathjoin('a','b')   # a/b
+        pathjoin('a:','b')  # a:b
+        pathjoin('a:','/b') # a:/b
+        pathjoin('a','/b')  # a/b  NOTE that this is different
+    """
+    if len(args) <= 1:
+        return ''.join(args)
+    
+    root,first,rest = args[0],args[1],args[2:]
+    
+    if root.endswith(':') or first.startswith('/'):
+        path = root + first
+    else:
+        path = f'{root}/{first}' 
+    
+    return os.path.join(path,*rest)
+     
         
         
         

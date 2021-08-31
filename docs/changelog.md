@@ -2,6 +2,11 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20210830.0.BETA
+
+- Major optimization for actions to minimize rclone calls. Especially useful with lots of files to backup. See [misc](misc.md) for discussion
+- When there is an error, the full debug log is dumped to a temp location. 
+
 ## 20210819.0.BETA
 
 - Adds `pre_sync_shell` and `post_sync_shell` options. Tests.

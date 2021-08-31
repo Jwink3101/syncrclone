@@ -41,6 +41,39 @@ with lzma.open('A-name_fl.json.xz','wt') as file:
     json.dump(files,file,ensure_ascii=False)
 ```
 
+## Optimized Actions
+
+There are essentially three (or two or four depending on how you count) actions besides transfers that we have to consider.
+
+1. Move
+2. Backup (before getting overwritten)
+3. Delete (with or without backup)
+
+Since we wrap rclone and have to make a call for each one, it can get slow. This is as opposed to using the built in methods that know all of the files. So there are some optimizations that can speed it up.
+
+First, all operations always move to a non-existing object. It wouldn't register as a move or it is a backup directory. So always use `--no-check-dest`.
+
+Then, to speed it up, use the following logic **in order**:
+
+- Deletes with backup: This will depend on the remote.
+    - Remote supports server-side move:
+        - At the first level, combine all of the deletes. They have to be at the first level so that you do not overlap (e.g. you can do `move --files-from <files> remote:subdir/ remote:.syncrclone/backups/<dated>/subdir` but you cannot do `move --files-from <files> remote: remote:.syncrclone/backups/<dated>/` since they overlap)
+        - All files at the root get translated into a move to the backup dir
+        - Use `move --files-from <files> remote:<subdir> remote:.syncrclone/backups/<dated>/<subdir>`
+    - Remote does not support server-side move: Since rclone will do that as a copy+delete, we do the same. Add all files to backup and then delete. Note the order of backup and delete
+- Moves: Has to be done one at a time. No getting around it
+- Backups: Since rclone *will* allow `copy --files-from` on overlapping remotes, use that for all backups into a single call
+- Delete without backup: Use `delete --files-from`
+
+### Overlapping Remotes
+
+Rclone is very conservative about overlaps. See [this forum post](https://forum.rclone.org/t/moving-the-contents-of-a-folder-to-the-root-directory/914/7) and [this tracking issue (1082)](https://github.com/rclone/rclone/issues/1082). For an explanation on why copy works, see [#1319](https://github.com/rclone/rclone/issues/1319):
+
+> For a remote which doesn't [move whole directoreis] it has to move each individual file which might fail and need a retry which is where the trouble starts...
+
+
+
+
 ## Locks
 
 syncrclone includes a locking system where a lock file is created and syncrclone won't run unless it has been removed. Note that this isn't a perfect system. Known issues are:

@@ -85,6 +85,7 @@ def test_main(remoteA,renamesA,
     test.config.conflict_mode = 'newer_tag' # Deprecated. Update in the future
     
     test.config.log_dest = 'logs/'    
+    test.config.name='main'
     test.write_config()
     
     ## Initial files
@@ -180,7 +181,7 @@ def test_main(remoteA,renamesA,
     diffs = test.compare_tree()
     
     # Exclusions except when filters to allow!
-    assert {('missing_inA', 'newB.no'), ('missing_inB', 'newA.no')} == diffs 
+    assert {('missing_inA', 'newB.no'), ('missing_inB', 'newA.no')} == diffs,diffs
     
     stdout = ''.join(test.synclogs[-1])
     # Check on A from now on!
@@ -1078,9 +1079,74 @@ def test_prepost_script(dry):
     
     os.chdir(PWD0)
 
+@pytest.mark.parametrize("nomovesA,nomovesB",[(0,0),(1,0),(0,1),(1,1),(None,None)])
+def test_disable_moves(nomovesA,nomovesB):
+    remoteA = 'A'
+    remoteB = 'B'
+    set_debug(False)   
+    
+    test = testutils.Tester('test_disabled_moves',remoteA,remoteB)   
+    
+    if nomovesA is None and nomovesB is None:
+        test.config.rclone_flags += ['--disable','move']
+        nomovesA = nomovesB = True # since I will test this later
+    else:
+        if nomovesA:
+            test.config.rclone_flagsA += ['--disable','move']
+        if nomovesB:
+            test.config.rclone_flagsB += ['--disable','move']
+    
+    test.write_config()
+    
+    test.write_pre('A/delA.txt','')
+    test.write_pre('A/subdirA/delAA.txt','')
+    test.write_pre('A/subdirA/del2A.txt','')
+    test.write_pre('A/delB.txt','')
+    test.write_pre('A/subdirB/delBB.txt','')
+    test.write_pre('A/subdirB/del2B.txt','')
+    
+    test.setup()
+    
+    os.remove('A/delA.txt')
+    os.remove('A/subdirA/delAA.txt')
+    os.remove('A/subdirA/del2A.txt')
+    os.remove('B/delB.txt')
+    os.remove('B/subdirB/delBB.txt')
+    os.remove('B/subdirB/del2B.txt')
+    
+    obj = test.sync(['--debug'])
+    
+    assert test.compare_tree() == set()
+    assert exists('A/.syncrclone/backups/*_A/delB.txt')
+    assert exists('A/.syncrclone/backups/*_A/subdirB/delBB.txt')
+    assert exists('A/.syncrclone/backups/*_A/subdirB/del2B.txt')
+    assert exists('B/.syncrclone/backups/*_B/delA.txt')
+    assert exists('B/.syncrclone/backups/*_B/subdirA/delAA.txt')
+    assert exists('B/.syncrclone/backups/*_B/subdirA/del2A.txt')
+    
+    stdout = ''.join(test.synclogs[-1])
+    
+    linesA = [
+        ('DEBUG: Add to backup + delete A [',nomovesA),
+        ("rootdirs prior A",not nomovesA),
+        ("root-level backup as move ('delB.txt',",not nomovesA),   
+        ("rootdirs post A",not nomovesA)]
+    for lineA,tt in linesA:
+        assert (lineA in stdout) == tt,(lineA,tt)
+        
+    linesB = [
+        ('DEBUG: Add to backup + delete B [',nomovesB),
+        ("rootdirs prior B",not nomovesB),
+        ("root-level backup as move ('delA.txt',",not nomovesB),   
+        ("rootdirs post B",not nomovesB)]
+    for lineB,tt in linesB:
+        assert (lineB in stdout) == tt,(lineB,tt)
+        
+    
+    os.chdir(PWD0)
 
 if __name__ == '__main__':
-#     test_main('A','mtime','B','hash','size') # Vanilla test covered below
+    test_main('A','mtime','B','hash','size') # Vanilla test covered below
    
 #     test_main('A','inode','cryptB:','mtime','mtime')
 #     test_main('cryptA:','size','cryptB:','mtime','mtime')
@@ -1116,12 +1182,14 @@ if __name__ == '__main__':
 #         test_no_modtime(always,compare,renamesA,renamesB,conflict_mode)
 #     test_prepost_script(False)
 #     test_prepost_script(True)
+#     for nomovesA,nomovesB in [(0,0),(1,0),(0,1),(1,1),(None,None)]:
+#         test_disable_moves(nomovesA,nomovesB)
         
     # hacked together parser. This is used to manually test whether the interactive
     # mode is working
     if len(sys.argv) > 1 and sys.argv[1] == '-i':
         test_main('A','hash','B','hash','mtime',interactive=True)
-# 
+
 
     print('*'*80)
     print(' ALL PASSED')

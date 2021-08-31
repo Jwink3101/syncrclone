@@ -1,4 +1,4 @@
-__version__ = '20210819.0.BETA'
+__version__ = '20210830.0.BETA'
 LASTRCLONE = '1.56.0' # This is the last version I tested with. Does *NOT* mean it won't work further.
 
 import time
@@ -20,6 +20,8 @@ class Log:
         self.hist = []
     
     def log(self,*a,**k):
+        debugmode = k.pop('__debug',False)
+        
         t = time.strftime("%Y-%m-%d %H:%M:%S:", time.localtime())
         a = [t] + list(a)
         
@@ -28,7 +30,12 @@ class Log:
         file = io.StringIO()
         k['file'] = file
         print(*a,**k)
-        self.hist.append(file.getvalue())
+        val = file.getvalue()
+        if not debugmode or DEBUG:
+            self.hist.append((True,val))
+        else:
+            self.hist.append((False,val))
+            return
         
         del k['file']
         if file0:
@@ -37,18 +44,18 @@ class Log:
     __call__ = log
     
     def clear(self):
-        self.hist = []
+        self.hist.clear()
+ 
 
     def dump(self,path,mode='wt'):
         log('---- END OF LOG ----')
         with open(path,mode) as file:
-            file.write(''.join(self.hist))
+            file.write(''.join(line for t,line in self.hist if t))
     
 log = Log()
 
 def debug(*args,**kwargs):
-    if not DEBUG:
-        return
+    kwargs['__debug'] = True
     args = ('DEBUG:',) + args
     log(*args,**kwargs)
 

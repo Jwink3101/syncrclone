@@ -57,7 +57,7 @@ class Config:
         with open(outpath,'wt') as file:
             file.write(txt)
             
-        debug("Wrote template config to {outpath}")
+        debug(f"Wrote template config to {outpath}")
     
     def parse(self):
         if self._configpath is None:
@@ -237,9 +237,17 @@ def cli(argv=None):
         if _RETURN:
             return r
     except Exception as E:
+        import tempfile
+        
+        tmpdir = tempfile.TemporaryDirectory().name
+        os.makedirs(tmpdir)
+        print(f"ERROR. Dumping logs (with debug) to '{tmpdir}/log.txt'",file=sys.stderr)
+        with open(f'{tmpdir}/log.txt','wt') as fout:
+            fout.write(''.join(line for _,line in log.hist))
+                    
         if get_debug():
             raise
-        #log('ERROR: ' + type(E).__name__,file=sys.stderr)
+
         log('ERROR: ' + str(E),file=sys.stderr)
         sys.exit(1)
 
