@@ -398,9 +398,9 @@ class Rclone:
         cmd0 =  [None] # Will get set later
         cmd0 += ['-v','--stats-one-line','--log-format','']
         # We know in all cases, the dest doesn't exists. For backups, it's totally new and
-        # for moves, if it existed, it wouldn't show as a move. So never check dest
-        cmd0 += ['--no-check-dest']
-        cmd0 += ['--retries','4'] # Extra safe.
+        # for moves, if it existed, it wouldn't show as a move. So never check dest, 
+        # always transfer, and do not traverse
+        cmd0 += ['--no-check-dest','--ignore-times','--no-traverse']
         cmd0 += config.rclone_flags + self.add_args + getattr(config,f'rclone_flags{AB}')
         
         backups = backups.copy() # Will be appended so make a new copy
