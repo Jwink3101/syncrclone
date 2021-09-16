@@ -10,7 +10,7 @@ The algorithm is summarized as follows:
 
 ## File Listing
 
-Use rclone to download the older list. This is based on config `name` so that multiple syncs can be set up. The file is saved in `.syncrclone/{AB}-{name}_filelist` file. It is a simple json file listing that has been UTF8 encoded and run through `zlib.compress`.
+Use rclone to download the older list. This is based on config `name` so that multiple syncs can be set up. 
 
 Use rclone to list files for both remotes for the current list. If config `compare` or `renames{A/B}` has `hash` attribute, need to also get file hashes. Alternatively, if `reuse_-_hashes{A/B}`, use `size,mtime,filename` to get the previous hash value. Then call rclone again with `--files-from` to get the hash of the remaining files.
 
@@ -80,3 +80,7 @@ If *anything* was changed or transfered to a side, a list is remade. The same ha
 * Perform a current listing of each remote
 * Download the previous listing of each remote
 * Remove (from *both* old and current) any files that have the same `filename` and `--compare` attribute. Removing from the old list is
+
+### Avoiding Relisting
+
+Theatrically, you could avoid re-listing since you can propagate the same changes to the file lists that you do in practice. But this is fragile and introduces many edge cases; especially around hashes and tracking. This may be considered in the future but not at the moment.

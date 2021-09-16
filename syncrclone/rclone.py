@@ -366,7 +366,8 @@ class Rclone:
         #           Optimize at the root subdir level so that we do not overlap with .syncrclone 
         #           but can otherwise use `move --files-from`
         #           
-        #           The rootlevel ones will have to be a vanilla move. Add them          
+        #           The rootlevel ones will have to be a vanilla move. Add them.      
+        #           See references below for why this can't just be one call.    
         #
         #       If the remote does not support moves: (i.e. it will internally 
         #       use copy+delete)
@@ -635,7 +636,7 @@ class Rclone:
         
         cmd = ['rmdirs','-v','--stats-one-line','--log-format','','--retries','1'] 
         
-        def do_action(rmdir):
+        def _rmdir(rmdir):
             _cmd = cmd + [pathjoin(remote,rmdir)]
             try:
                 return rmdir,self.call(_cmd,stream=False,logstderr=False)
@@ -646,7 +647,7 @@ class Rclone:
                 return rmdir,'<< could not delete >>'
             
         with ThreadPoolExecutor(max_workers=int(config.action_threads)) as exe:
-            for rmdir,res in exe.map(do_action,rmdirs):
+            for rmdir,res in exe.map(_rmdir,rmdirs):
                 log(f'rmdirs (if possible) on {AB}: {rmdir}')
                 for line in res.split('\n'):
                     line = line.strip()
@@ -717,9 +718,8 @@ def get_empty_folders(folders,files):
     for file in files:
         parents.update(all_parents(os.path.dirname(file['Path'])))
     
-    folders = [folder['Path'] for folder in folders]
-    empty = set(folder for folder in folders if folder not in parents)
-    return empty
+    folders = set(folder['Path'] for folder in folders)
+    return folders - parents
         
 def all_parents(dirpath):
     """Yield dirpath and all parents of dirpath"""

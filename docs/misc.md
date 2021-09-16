@@ -71,15 +71,14 @@ Rclone is very conservative about overlaps. See [this forum post](https://forum.
 
 > For a remote which doesn't [move whole directoreis] it has to move each individual file which might fail and need a retry which is where the trouble starts...
 
-
-
-
 ## Locks
 
 syncrclone includes a locking system where a lock file is created and syncrclone won't run unless it has been removed. Note that this isn't a perfect system. Known issues are:
 
 * Non-syncrclone usage will not set nor respect locks
 * Race conditition possible if two sync jobs are started while the locks are being set
+
+Locks may be removed in future versions as they are not particularly robust.
 
 ## Interruptions
  

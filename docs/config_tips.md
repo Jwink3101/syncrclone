@@ -1,6 +1,8 @@
 # Configuration Tips
 
-The use of a Python configuration file makes this very flexible. Some tips are included
+The use of a Python configuration file makes this very flexible.
+
+Most of the tips are **in the config file** but some are also addressed here.
 
 ## Paths
 
@@ -101,14 +103,21 @@ remoteB = 'remoteB:path/to/remote'
 name = hostname
 ```
 
-If the conifg file is in the sync directory (for example `scripts/sync.py`), the following may be helpful. Again, note the name is still set
+If the config file is in the sync directory (for example `scripts/sync.py`), the following may be helpful. Again, note the name is still set
 
 ```python
 import os,subprocess
 remoteA = os.path.eabspath('../')
 remoteB = 'remoteB:path/to/remote'
 
-name = subprocess.check_call(['hostname'])
+name = subprocess.check_output(['hostname']).decode().strip()
+```
+
+Or you can use `socket` for a slightly different answer (depending on setup)
+
+```python
+import socket
+hostname = socket.getfqdn()
 ```
 
 ## Rclone config passwords

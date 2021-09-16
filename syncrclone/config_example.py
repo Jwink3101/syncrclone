@@ -111,7 +111,7 @@ tag_conflict = False
 # Hashes can be expensive to compute on some remotes such as local or sftp.
 # As such, rather than recompute them all, the hashes of the previous state
 # can be used if the filename,size,mtime all match. Then the hashes of the 
-# remaining files will be computed is a second rclone call.
+# remaining files will be computed in a second rclone call.
 #
 # For most other remotes (e.g. S3, B2), hashes are stored by the remote
 # so there is no need to reuse them
@@ -124,9 +124,8 @@ reuse_hashesB = False
 # server-side modtime with a cache but that is not yet possible.
 always_get_mtime = True 
 
-# When backups are set, all overwrites or deletes will instead be backed up.
-# The only reason this should be disabled is if you plan to use some backup
-# built into BOTH remotes
+# When backups are set, all overwrites or deletes will instead be backed up (moved into
+# the .syncrclone folder)
 backup = True
 
 # Specify whether to also sync the backed up files between A and B. If True,
@@ -150,22 +149,21 @@ hash_fail_fallback = None # {'size','mtime',None}
 set_lock = False
 
 
-# While transfers will follow the respective rclone flags 
-# (e.g. ['--transfers','10'], delete, copy, and move actions all happen with
-# their own call to rclone. This happens in threads to speed it up. This can
-# be toggled. 
+# While transfers will follow the respective rclone flags  (e.g. ['--transfers','10'], 
+# delete, backup, and move actions need more calls. There is some optimization but it
+# still may need more than one call. This allows it to happen in separate rclone calls. 
 action_threads = 1 # Some remotes do not like concurrent rclone calls so this is the default
 # action_threads = __CPU_COUNT__ // 1.5
 # action_threads = 4
 
 # syncrclone does not transfer empty directories however if a directory is
 # empty after a sync and it was NOT empty before (e.g. the directory was moved 
-# or deleted),then it can remove them. Note that (a) this only removes 
+# or deleted), then it can remove them. Note that (a) this only removes 
 # directories that were *made* empty by syncrclone, and (b) if files still 
 # exist in the directory (e.g. they were excluded), it will *not* delete them.
 #
 # This settings doesn't make sense for some remotes. Leave as None to set
-# automatically
+# automatically based on whether the remote supports empty directories.
 cleanup_empty_dirsA = None
 cleanup_empty_dirsB = None
 
@@ -181,9 +179,9 @@ cleanup_empty_dirsB = None
 #   'size'    : Size of the file only. VERY UNSAFE
 #   'mtime'   : mtime and size. Slightly safer than size but still risky
 #   'hash'    : Hash of the files
-#   'inode'   : inode (plus mtime and size) of the file. See below for
-#               getting inodes. Can only be used if local and will raise issues
-#               otherwise
+#   'inode'   : inode (plus mtime and size) of the file. This is only supported for local
+#               remotes and may have issues with links. Support may be removed in the
+#               future.
 #    None     : Disable rename tracking
 renamesA = None
 renamesB = None
@@ -202,7 +200,7 @@ log_dest = '.syncrclone/logs' # Relative to root of each remote
 local_log_dest = ''
 
 ## Pre- and Post-run
-# Specify shell code to be evaluated before or after running syncrclone. Note
+# Specify shell code to be evaluated before and/or after running syncrclone. Note
 # these are all run from the directory of this config (as with everything else).
 # STDOUT and STDERR will be captured. Note that there is no validation or 
 # security of the inputs. These are not actually called if using dry-run.

@@ -2,6 +2,10 @@
 
 This will likely get wiped when I go out of beta. 
 
+##
+
+- Mostly documentation fixes. Closes #8
+
 ## 20210830.0.BETA
 
 - Major optimization for actions to minimize rclone calls. Especially useful with lots of files to backup. See [misc](misc.md) for discussion

@@ -112,6 +112,8 @@ class Config:
             if val not in options:
                 raise ConfigError(f"'{key}' must be in {options}. Specified '{val}'")
         
+        self._config['action_threads'] = int(max([self._config['action_threads'],1]))
+        
         # To be deprecated
         if self._config['conflict_mode'].endswith('_tag'):
             newmode = self._config['conflict_mode'][:-4]
