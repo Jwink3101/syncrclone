@@ -12,12 +12,13 @@ For example, if you call
 
     $ syncrclone /full/path/to/sync/config.py
 
-It is *alwasy* executed the same as if you did
+It is *always* executed the same as if you did
 
     $ cd /full/path/to/sync/
     $ syncrclone config.py
     
 This is important to note when using local mode as rclone will be evaluated in the `.syncrclone` directory.
+
 
 ## Attribute Settings
 
@@ -49,7 +50,7 @@ otherwise
 
     renames(AB) = 'mtime'
 
-If a remote does not support hashes (e.g. crypt), then (asume B is crypt
+If a remote does not support hashes (e.g. crypt), then (asume B is crypt)
 
     compare = 'mtime'
     conflict_mode = 'newer_tag'
@@ -70,7 +71,7 @@ That is, *no rename tracking!*. If you *really* want to risk it, you can do
     renamesA = 'size'
     renamesB = 'size'
 
-but be aware that a deleted file may look like a rename. This is especially true for smaller files where they are less likely to have unique sizes.
+but be aware that a deleted file may look like a rename. This is especially true for smaller files where they are less likely to have unique sizes. It is still safe to use `size` for `compare` since it checks filename and size (though can still have a false-negative if a change doesn't alter the size)
 
 ## Dynamic remote directories
 
@@ -83,17 +84,18 @@ import os,subprocess
 remoteA = os.path.expanduser('~/syndirs/documents')
 remoteB = 'remoteB:path/to/remote'
 
-name = subprocess.check_call(['hostname'])
+# use hostname for a unique name
+name = subprocess.check_output(['hostname']).decode().strip()
 ```
 
 Or specific for each one
 
 ```python
 import subprocess
-hostname = subprocess.check_call(['hostname'])
+hostname = subprocess.check_output(['hostname']).decode().strip()
 if hostname == 'machine1':
     remoteA = '/path/to/machine1/documents'
-elif hostname = 'machine2':
+elif hostname == 'machine2':
     remoteA = '/different/path/to/documents'
 else:
     raise ValueError(f"Unrecognized host {hostname}")
@@ -103,21 +105,29 @@ remoteB = 'remoteB:path/to/remote'
 name = hostname
 ```
 
-If the config file is in the sync directory (for example `scripts/sync.py`), the following may be helpful. Again, note the name is still set
+Or when in local mode (i.e. the config is in `.syncrclone/config.py` and you don't specify its path), you may just want to change the name.
 
 ```python
 import os,subprocess
-remoteA = os.path.eabspath('../')
-remoteB = 'remoteB:path/to/remote'
-
 name = subprocess.check_output(['hostname']).decode().strip()
 ```
 
-Or you can use `socket` for a slightly different answer (depending on setup)
+Or you can use `socket` for a (potentially) slightly different answer (depending on setup)
 
 ```python
 import socket
-hostname = socket.getfqdn()
+name = socket.getfqdn()
+```
+
+You can also do something like specify the name in your `.bashrc`:
+
+    export SYNCRCLONE_NAME="my_computer_name"
+
+then in your config
+
+```python
+import os
+name = os.environ['SYNCRCLONE_NAME']
 ```
 
 ## Rclone config passwords
@@ -139,7 +149,7 @@ Recall syncrclone *directly* applies rclone's filtering and is set via `filter_f
 filter_flags = ['--filter','+ *.keep.exc',
                 '--filter','- *.exc']
 ```
-The firt filter will keep anything ending in `*.keep.exc` and be matched before the second filter. The second filter will exclude everything else with `*.exc`.
+The first filter will keep anything ending in `*.keep.exc` and be matched before the second filter. The second filter will exclude everything else with `*.exc`.
 
 ### Suggested Filters
 
