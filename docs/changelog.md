@@ -2,7 +2,11 @@
 
 This will likely get wiped when I go out of beta. 
 
-##
+## 20210924.0.BETA
+
+- Adds `--override` CLI flag. Includes updated tests
+
+## 20210916.0.BETA
 
 - Mostly documentation fixes. Closes #8
 

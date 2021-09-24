@@ -59,7 +59,7 @@ class Config:
             
         debug(f"Wrote template config to {outpath}")
     
-    def parse(self):
+    def parse(self,skiplog=False,text=None):
         if self._configpath is None:
             raise ValueError('Must have a config path')
         
@@ -68,11 +68,14 @@ class Config:
         self._config['__dir__'] = os.path.dirname(self._config['__file__'])
         self._config['__CPU_COUNT__'] = os.cpu_count()
         
-        exec(self._template, self._config)
         
-        with open(self._configpath,'rt') as file:
-            os.chdir(self._config['__dir__']) # Globally set the program here
-            exec(file.read(),self._config)
+        
+        if not text:
+            exec(self._template, self._config) # Only reset if reading
+            with open(self._configpath,'rt') as file:
+                os.chdir(self._config['__dir__']) # Globally set the program here
+                text = file.read()
+        exec(text,self._config)
         
         # clean up all of the junk
         _tmp = {}
@@ -121,6 +124,9 @@ class Config:
             warnings.warn((f" conflict_mode '{self._config['conflict_mode']}' deprecated. "
                            f"Use `conflict_mode = {newmode}` and `tag_conflict = True`"))
             self._config['conflict_mode'] = newmode
+        
+        if skiplog:
+            return 
         
         log(f"A: '{self.remoteA}'")
         log(f"B: '{self.remoteB}'")
@@ -176,12 +182,16 @@ def cli(argv=None):
     parser.add_argument('--break-lock',choices=['both','A','B'],
         help="Break locks on either A, B or both remotes")
     parser.add_argument('--debug',action='store_true',help='Debug messages will be printed')
-    parser.add_argument('--dry-run',action='store_true',
+    parser.add_argument('-n','--dry-run',action='store_true',
         help='Run in dry-run mode and do not change anything. See also --interactive')
     parser.add_argument('-i','--interactive',action='store_true',
         help='Similar to --dry-run except it will show planned actions and prompt as to whether or not to proceed')
     parser.add_argument('--new',action='store_true',help='Path to save a new config file')
     parser.add_argument('--no-backup',action='store_true',help='Do not do any backups on this run')
+    parser.add_argument('--override',action='append',default=list(),metavar="'OPTION = VALUE'",
+        help=("Override any config option for this call only. Must be specified as "
+              "'OPTION = VALUE', where VALUE should be properly shell escaped. "
+              "Can specify multiple times. There is no input validation of any sort."))
     parser.add_argument('--version', action='version', version='syncrclone-' + __version__)
 
     if argv is None:
@@ -226,6 +236,10 @@ def cli(argv=None):
             raise ConfigError(f"config file '{cliconfig.configpath}' does not exist")
     
         config.parse() # NOTE: This now changes where the entire program is executed to the path of that file!
+        if cliconfig.override:
+            for item in cliconfig.override:
+                log(f'CLI Override: {item}')
+            config.parse(text='\n'.join(cliconfig.override),skiplog=True)
         
         noback = cliconfig.no_backup; del cliconfig.no_backup # == to pop
         if noback:

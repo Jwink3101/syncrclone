@@ -1076,7 +1076,6 @@ def test_prepost_script(dry):
         assert 'STDOUT: pretest pre-test' in log
         assert 'STDOUT: posttest post-test' in log     
         
-    
     os.chdir(PWD0)
 
 @pytest.mark.parametrize("nomovesA,nomovesB",[(0,0),(1,0),(0,1),(1,1),(None,None)])
@@ -1142,11 +1141,35 @@ def test_disable_moves(nomovesA,nomovesB):
     for lineB,tt in linesB:
         assert (lineB in stdout) == tt,(lineB,tt)
         
+    os.chdir(PWD0)
+
+def test_cli_override():
+    remoteA = 'A'
+    remoteB = 'B'
+    set_debug(False)   
     
+    test = testutils.Tester('cli_override',remoteA,remoteB)   
+    
+    # Use pre_sync_shell as an easy tester
+    test.config.pre_sync_shell  = """\
+        echo aaa > tmp""" 
+
+    test.write_config()
+    
+    test.write_pre('A/fileA.txt','A')
+    test.setup()
+    
+    with open('tmp') as f:
+        assert f.read().strip() == 'aaa'
+    
+    test.sync(flags=['--override','pre_sync_shell = "echo bbb > tmp"'])
+    with open('tmp') as f:
+        assert f.read().strip() == 'bbb'
+#     
     os.chdir(PWD0)
 
 if __name__ == '__main__':
-    test_main('A','mtime','B','hash','size') # Vanilla test covered below
+#     test_main('A','mtime','B','hash','size') # Vanilla test covered below
    
 #     test_main('A','inode','cryptB:','mtime','mtime')
 #     test_main('cryptA:','size','cryptB:','mtime','mtime')
@@ -1184,7 +1207,9 @@ if __name__ == '__main__':
 #     test_prepost_script(True)
 #     for nomovesA,nomovesB in [(0,0),(1,0),(0,1),(1,1),(None,None)]:
 #         test_disable_moves(nomovesA,nomovesB)
-        
+#     test_cli_override()
+    
+    
     # hacked together parser. This is used to manually test whether the interactive
     # mode is working
     if len(sys.argv) > 1 and sys.argv[1] == '-i':

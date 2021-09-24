@@ -101,7 +101,6 @@ All filtering is handled by rclone's filtering. See their [detailed documentatio
 
 Filter flags should be set *only* in the config `filter_flags` section. There are many options for filtering such as `--exclude path`. See note below about `--exclude-if-present`.
 
-
 Remember that rclone is called from the same directory as the config file so make sure paths for flags such as `--filter-from` are correctly specified.
 
 See more on Filters in the [config tips](docs/config_tips.md)

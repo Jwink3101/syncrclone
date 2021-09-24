@@ -183,6 +183,11 @@ cleanup_empty_dirsB = None
 #               remotes and may have issues with links. Support may be removed in the
 #               future.
 #    None     : Disable rename tracking
+#
+# Because moving files has to be done with individual rclone calls, it is often more
+# efficient to disable rename tracking as a delete and copy can be more efficient for
+# lots of files. It also doesn't make sense to use renames on A or B if the remote B or A 
+# doesn't support server-side copy or move.
 renamesA = None
 renamesB = None
 
@@ -197,7 +202,7 @@ renamesB = None
 # Can also specify a local location. Useful if both remotes are remote. Recall
 # that the paths are relative to this file. If blank, will not save logs
 log_dest = '.syncrclone/logs' # Relative to root of each remote
-local_log_dest = ''
+local_log_dest = '' # Note on a remote
 
 ## Pre- and Post-run
 # Specify shell code to be evaluated before and/or after running syncrclone. Note

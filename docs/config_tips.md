@@ -210,7 +210,14 @@ This is only useful if the remote even supports empty directories. If it does no
 Leave on `None` to let syncrclone decide based on whether or not the remote supports them.
 
 
+## Overriding Configs
 
+Settings can also be overwritten for a given call with the `--override` flag. This is useful in cases where you may want to change a setting for this run *only*. For example,
+if you usually have `reuse_hashesB = True` but you want to refresh them all, you can do:
+
+    $ syncrclone --override "reuse_hashesB = False" 
+
+and it will change the setting for this run only
 
 
 
