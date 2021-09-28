@@ -746,12 +746,16 @@ def pathjoin(*args):
     
     root,first,rest = args[0],args[1],args[2:]
     
+    if root.endswith('/'):
+        root = root[:-1]
+    
     if root.endswith(':') or first.startswith('/'):
         path = root + first
     else:
         path = f'{root}/{first}' 
     
-    return os.path.join(path,*rest)
+    path = os.path.join(path,*rest)
+    return path
      
         
         

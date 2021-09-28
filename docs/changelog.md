@@ -2,6 +2,10 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20210928.0.BETA
+
+- Fixes joining paths with `//`. Hopefully fixes #11
+
 ## 20210924.0.BETA
 
 - Adds `--override` CLI flag. Includes updated tests
