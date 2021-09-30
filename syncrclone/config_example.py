@@ -212,6 +212,10 @@ local_log_dest = '' # Note on a remote
 pre_sync_shell = ""
 post_sync_shell = ""
 
+# Be default, even if the shell commands had an error, syncrclone out continue. 
+# This setting can make it so that it will exit. Note that it ONLY applies to the 
+# pre_sync_shell script as the only thing to break afterwards is relisting
+stop_on_shell_error = False
 
 
 

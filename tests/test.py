@@ -1050,7 +1050,9 @@ def test_prepost_script(dry):
     test = testutils.Tester('prepost_script',remoteA,remoteB)   
     test.config.pre_sync_shell  = """\
         myvarPRE=pre-test
-        echo pretest $myvarPRE""" 
+        echo pretest $myvarPRE
+        echo eee 1>&2
+        """ 
     test.config.post_sync_shell  = """\
         myvarPOST=post-test
         echo posttest $myvarPOST""" 
@@ -1064,18 +1066,63 @@ def test_prepost_script(dry):
         test.setup()
     
     log = ''.join(test.synclogs[-1]) 
+
     assert '$         myvarPRE=pre-test' in log
     assert '$         echo pretest $myvarPRE' in log
+    assert '$         echo eee 1>&2' in log
     assert '$         myvarPOST=post-test' in log
     assert '$         echo posttest $myvarPOST' in log
-        
+    
     if dry:
         assert 'STDOUT: pretest pre-test' not in log
         assert 'STDOUT: posttest post-test' not in log
+        assert 'STDERR: eee' not in log
     else:
         assert 'STDOUT: pretest pre-test' in log
-        assert 'STDOUT: posttest post-test' in log     
+        assert 'STDOUT: posttest post-test' in log 
+        assert 'STDERR: eee' in log    
         
+    os.chdir(PWD0)
+
+@pytest.mark.parametrize("stop_on_shell_error",[True,False])
+def test_prepost_error(stop_on_shell_error):
+    remoteA = 'A'
+    remoteB = 'B'
+    set_debug(False)   
+    
+    test = testutils.Tester('prepost_error',remoteA,remoteB)   
+    test.config.stop_on_shell_error = False
+    test.write_config()
+    
+    test.write_pre('A/fileA.txt','A')
+    test.setup()
+    test.write_pre('A/new.txt','new')
+    
+    # We can't use the built in logging since it will break from the system exit
+    # so out shells write out. 
+    
+    test.config.pre_sync_shell  = """\
+        echo "test" > tmp.txt
+        exit 4
+        """ 
+    
+    test.config.stop_on_shell_error = stop_on_shell_error
+    test.write_config()
+    try:
+        test.sync()
+    except SystemExit:
+        pass
+
+    assert exists('tmp.txt')
+    with open('tmp.txt') as f: 
+        assert f.read().strip() == 'test'
+    
+    diffs = test.compare_tree()
+    if stop_on_shell_error:
+        assert diffs == {('missing_inB', 'new.txt')}
+    else:
+        assert diffs == set()
+      
     os.chdir(PWD0)
 
 @pytest.mark.parametrize("nomovesA,nomovesB",[(0,0),(1,0),(0,1),(1,1),(None,None)])
@@ -1169,7 +1216,7 @@ def test_cli_override():
     os.chdir(PWD0)
 
 if __name__ == '__main__':
-#     test_main('A','mtime','B','hash','size') # Vanilla test covered below
+    test_main('A','mtime','B','hash','size') # Vanilla test covered below
    
 #     test_main('A','inode','cryptB:','mtime','mtime')
 #     test_main('cryptA:','size','cryptB:','mtime','mtime')
@@ -1205,6 +1252,8 @@ if __name__ == '__main__':
 #         test_no_modtime(always,compare,renamesA,renamesB,conflict_mode)
 #     test_prepost_script(False)
 #     test_prepost_script(True)
+#     test_prepost_error(True)
+#     test_prepost_error(False)
 #     for nomovesA,nomovesB in [(0,0),(1,0),(0,1),(1,1),(None,None)]:
 #         test_disable_moves(nomovesA,nomovesB)
 #     test_cli_override()

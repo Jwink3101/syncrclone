@@ -2,6 +2,11 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20210930.0.BETA
+
+- Adds the option to stop if there is an error in the pre/post shell script calls. 
+- Fixes a bug where rclone flags are not using in rmdirs
+
 ## 20210928.0.BETA
 
 - Fixes joining paths with `//`. Hopefully fixes #11
@@ -30,7 +35,6 @@ This will likely get wiped when I go out of beta.
 ## 20210723.0.BETA
 
 - Fixes hash-based move tracking for rclone 1.56 which changed the hash names. Not only is it fixed but it is now more robust to this happening again. Will also map old names to new ones
-
 
 ## 20210720.0.BETA
 

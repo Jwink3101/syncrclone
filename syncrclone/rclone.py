@@ -62,7 +62,7 @@ class Rclone:
         Call rclone. If streaming, will write stdout & stderr to
         log. If logstderr, will always send stderr to log (default)
         """
-        cmd = [self.config.rclone_exe] + cmd
+        cmd = shlex.split(self.config.rclone_exe) + cmd
         debug('rclone:call',cmd)
         
         env = os.environ.copy()
@@ -634,7 +634,8 @@ class Rclone:
                 continue # ^^^ Add the / so it gets child dirs only
             rmdirs.append(diritem)
         
-        cmd = ['rmdirs','-v','--stats-one-line','--log-format','','--retries','1'] 
+        cmd = config.rclone_flags + self.add_args + getattr(config,f'rclone_flags{AB}')
+        cmd += ['rmdirs','-v','--stats-one-line','--log-format','','--retries','1'] 
         
         def _rmdir(rmdir):
             _cmd = cmd + [pathjoin(remote,rmdir)]
@@ -696,19 +697,26 @@ class Rclone:
             log(f'{prefix} {line}')
         
         if self.config.dry_run:
-            return log('NOT RUNNING')
+            return log('DRY-RUN: NOT RUNNING')
+            
         proc = subprocess.Popen(cmds,
                                 shell=True,
                                 stderr=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
-        out,err = proc.communicate()
-        for line in out.decode().split('\n'):
-            log(f'STDOUT: {line}')
-        for line in err.decode().split('\n'):
-            log(f'STDERR: {line}')
         
-            
-    
+        out,err = proc.communicate()
+        out,err = out.decode(),err.decode()
+        for line in out.split('\n'):
+            log(f'STDOUT: {line}')
+        
+        if err.strip():    
+            for line in err.split('\n'):
+                log(f'STDERR: {line}')
+        if proc.returncode > 0:
+            log(f'WARNING: Command return non-zero returncode: {proc.returncode}')
+            if self.config.stop_on_shell_error:
+                raise subprocess.CalledProcessError(proc.returncode, cmds)
+        
 def get_empty_folders(folders,files):
     """
     Returns the empty directories as a subset of folders
@@ -728,8 +736,6 @@ def all_parents(dirpath):
     if len(split) == 2: # Not done
         yield from all_parents(split[0])
         
-        
-
 def pathjoin(*args):
     """
     This is like os.path.join but does some rclone-specific things because there could be
