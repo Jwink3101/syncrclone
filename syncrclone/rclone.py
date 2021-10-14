@@ -168,27 +168,6 @@ class Rclone:
         with lzma.open(dst) as file:
             return json.load(file)
 
-    def pull_prev_listLEGACY(self,*,remote=None):
-        import zlib
-        HEADER = b'zipjson\x00\x00' 
-        config = self.config
-        AB = remote
-        remote = {'A':config.remoteA,'B':config.remoteB}[remote]
-        
-        src = pathjoin(remote,'.syncrclone',f'{AB}-{self.config.name}_fl.zipjson')
-        dst = os.path.join(self.tmpdir,f'{AB}_prev')
-        mkdir(dst,isdir=False)
-        
-        cmd = config.rclone_flags \
-            + self.add_args \
-            + getattr(config,f'rclone_flags{AB}') \
-            +  ['copyto',src,dst]
-        self.call(cmd)
-        
-        with open(dst,'rb') as file:
-            file.seek(len(HEADER)) # Skip
-            return json.loads(zlib.decompress(file.read()))
-
     def file_list(self,*,prev_list=None,remote=None):
         """
         Get both current and previous file lists. If prev_list is
@@ -217,10 +196,8 @@ class Rclone:
         # build the command including initial filters *before* any filters set
         # by the user
         prev_list_name = pathjoin('.syncrclone',f'{AB}-{self.config.name}_fl.json.xz')
-        prev_list_nameLEGACY = pathjoin('.syncrclone',f'{AB}-{self.config.name}_fl.zipjson')
         cmd = ['lsjson',
                '--filter',f'+ /{prev_list_name}', # All of syncrclone's filters come first and include before exclude
-               '--filter',f'+ /{prev_list_nameLEGACY}', 
                '--filter','+ /.syncrclone/LOCK/*',
                '--filter','- /.syncrclone/**']
         
@@ -242,43 +219,31 @@ class Rclone:
         cmd.extend([
             '-R',
             '--no-mimetype', # Not needed so will be faster
+            '--files-only',
             ])
         
         cmd.append(remote)
                 
-        items = json.loads(self.call(cmd))
-        
-        folders = [] # Just the folder paths
-        files = []
-        for item in items:
-            item.pop('Name',None)
-            if item.pop('IsDir',False):
-                item.pop('Size',None)
-                item.pop('ModTime',None)
-                folders.append(item)
-                continue
-            
-            mtime = item.pop('ModTime')
-            item['mtime'] = utils.RFC3339_to_unix(mtime) if mtime else None
-            files.append(item)
-            
-        empties = get_empty_folders(folders,files)
+        files = json.loads(self.call(cmd))
+        debug(f'{AB}: Read {len(files)}')
+        for file in files:
+            for key in ['IsDir','Name','ID','Tier']: # Things we do not need. There may be others but it doesn't hurt
+                file.pop(key,None)
+            mtime = file.pop('ModTime',None)
+            file['mtime'] = utils.RFC3339_to_unix(mtime) if mtime else None
         
         # Make them DictTables
         files = DictTable(files,fixed_attributes=['Path','Size','mtime'])
         debug(f'{AB}: Read {len(files)}')
         
-        if not prev_list and {'Path':prev_list_name} in files:
+        if not prev_list and config.reset_state:
+            debug(f'Reset state on {AB}')
+            prev_list = []
+            if {'Path':prev_list_name} in files: files.remove({'Path':prev_list_name})    
+        elif not prev_list and {'Path':prev_list_name} in files:
             debug(f'Pulling prev list on {AB}')
             prev_list = self.pull_prev_list(remote=AB)
             files.remove({'Path':prev_list_name})
-            if {'Path':prev_list_nameLEGACY} in files:
-                log(f'NOTE: legacy previous list "{prev_list_nameLEGACY}" was found but NOT use on {AB}. You should remove it')
-        elif not prev_list and {'Path':prev_list_nameLEGACY} in files:
-            debug(f'Pulling prev list LEGACY on {AB}')
-            prev_list = self.pull_prev_listLEGACY(remote=AB)
-            files.remove({'Path':prev_list_nameLEGACY})
-            log(f'NOTE: legacy previous list "{prev_list_nameLEGACY}" was used on {AB}. You can now remove it')
         elif not prev_list:
             debug(f'NEW prev list on {AB}')
             prev_list = []
@@ -286,31 +251,15 @@ class Rclone:
         if not isinstance(prev_list,DictTable):
             prev_list = DictTable(prev_list,fixed_attributes=['Path','Size','mtime'])                
         
-        # inodes if local
-        if getattr(config,f'renames{AB}') == 'inode':
-            debug(f'{AB}: Getting local inodes')
-            if ':' in remote:
-                raise ConfigError('Cannot get inodes for non-local or named remote')
-            for file in files:
-                localfile = os.path.join(remote,file['Path'])
-                try:
-                    stat = os.stat(localfile)
-                except Exception as E:
-                    ## TODO: Handle links
-                    raise type(E)(f"Local file '{localfile}' not found. Check paths. May be a link")
-                file['inode'] = stat.st_ino
-            
-            files.add_fixed_attribute('inode')
-        
         if not compute_hashes or '--hash' in cmd:
-            return files,prev_list,empties
+            return files,prev_list
         
         # update with prev if possible and then get the rest
         not_hashed = []
         updated = 0
         for file in files: #size,mtime,filename
             prev = prev_list[{k:file[k] for k in ['Size','mtime','Path']}] # Will not find if no mtime not in remote
-            if not prev or 'Hashes' not in prev:
+            if not prev or 'Hashes' not in prev or not prev.get('mtime',None): # or '_copied' in prev: # Do not reuse a copied hash in case of incompatability
                 not_hashed.append(file['Path'])
                 continue
             updated += 1
@@ -318,7 +267,7 @@ class Rclone:
         
         if len(not_hashed) == 0:
             debug(f'{AB}: Updated {updated}. No need to fetch more')
-            return files,prev_list,empties
+            return files,prev_list
         debug(f'{AB}: Updated {updated}. Fetching hashes for {len(not_hashed)}')
         
         tmpfile = self.tmpdir + f'/{AB}_update_hash'
@@ -345,7 +294,7 @@ class Rclone:
         debug(f'{AB}: Updated hash on {len(updated)} files')
          
 
-        return files,prev_list,empties
+        return files,prev_list
 
     def delete_backup_move(self,remote,dels,backups,moves):
         """
@@ -404,6 +353,8 @@ class Rclone:
         cmd0 += ['--no-check-dest','--ignore-times','--no-traverse']
         cmd0 += config.rclone_flags + self.add_args + getattr(config,f'rclone_flags{AB}')
         
+        dels = dels.copy()
+        moves = moves.copy()
         backups = backups.copy() # Will be appended so make a new copy
         
         if config.backup:
@@ -482,8 +433,7 @@ class Rclone:
                 for line in res.split('\n'):
                     line = line.strip()
                     if line: log('rclone:',line) 
-    
-            
+
         ## Backups
         if backups:
             cmd = cmd0.copy()
@@ -716,26 +666,7 @@ class Rclone:
             log(f'WARNING: Command return non-zero returncode: {proc.returncode}')
             if self.config.stop_on_shell_error:
                 raise subprocess.CalledProcessError(proc.returncode, cmds)
-        
-def get_empty_folders(folders,files):
-    """
-    Returns the empty directories as a subset of folders
-    """
-    # Make a set of all parents
-    parents = set()
-    for file in files:
-        parents.update(all_parents(os.path.dirname(file['Path'])))
-    
-    folders = set(folder['Path'] for folder in folders)
-    return folders - parents
-        
-def all_parents(dirpath):
-    """Yield dirpath and all parents of dirpath"""
-    split = dirpath.rsplit(sep='/',maxsplit=1)
-    yield dirpath
-    if len(split) == 2: # Not done
-        yield from all_parents(split[0])
-        
+
 def pathjoin(*args):
     """
     This is like os.path.join but does some rclone-specific things because there could be

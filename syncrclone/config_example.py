@@ -148,7 +148,6 @@ hash_fail_fallback = None # {'size','mtime',None}
 # still respect them!
 set_lock = False
 
-
 # While transfers will follow the respective rclone flags  (e.g. ['--transfers','10'], 
 # delete, backup, and move actions need more calls. There is some optimization but it
 # still may need more than one call. This allows it to happen in separate rclone calls. 
@@ -167,6 +166,15 @@ action_threads = 1 # Some remotes do not like concurrent rclone calls so this is
 cleanup_empty_dirsA = None
 cleanup_empty_dirsB = None
 
+# By design, syncrclone needs to list all of the files on the remotes AFTER a run as well. 
+# This can be slow on some remotes so syncrclone can try to reduce relisting at the end by
+# using the original. Note that this feature is EXPERIMENTAL. There may be some edge
+# cases not considered; especially with regards to move tracking and hashes.
+#
+# However, for most use cases, this will improve performance and may become the default 
+# in the future
+avoid_relist = False
+
 ## Rename Tracking
 
 # Renames can be tracked if the file is unmodified on both sides and only
@@ -179,9 +187,6 @@ cleanup_empty_dirsB = None
 #   'size'    : Size of the file only. VERY UNSAFE
 #   'mtime'   : mtime and size. Slightly safer than size but still risky
 #   'hash'    : Hash of the files
-#   'inode'   : inode (plus mtime and size) of the file. This is only supported for local
-#               remotes and may have issues with links. Support may be removed in the
-#               future.
 #    None     : Disable rename tracking
 #
 # Because moving files has to be done with individual rclone calls, it is often more
@@ -192,6 +197,7 @@ renamesA = None
 renamesB = None
 
 ## Logs
+
 # All output is printed to stdout and stderr but this can also be saved and
 # uploaded to a remote. Note that the last upload step will not be in the logs
 # themselves. The log name is fixed as '{name}_{date}.log' but the path
@@ -202,7 +208,7 @@ renamesB = None
 # Can also specify a local location. Useful if both remotes are remote. Recall
 # that the paths are relative to this file. If blank, will not save logs
 log_dest = '.syncrclone/logs' # Relative to root of each remote
-local_log_dest = '' # Note on a remote
+local_log_dest = '' # NOT on a remote
 
 ## Pre- and Post-run
 # Specify shell code to be evaluated before and/or after running syncrclone. Note

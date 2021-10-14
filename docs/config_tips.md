@@ -38,17 +38,15 @@ In general though, I suggest using
     compare = 'mtime'
     conflict_mode = 'newer_tag'
     
-then if hashes are easily available
+But if hashes are *easily* available
     
     renames(AB) = 'hash'
-
-otherwise if a remote is local and support inodes:
-
-    renames(AB) = 'inode'
 
 otherwise
 
     renames(AB) = 'mtime'
+
+Note that renames with `mtime` also include size. And they will not work if there is more than one candidate.
 
 If a remote does not support hashes (e.g. crypt), then (asume B is crypt)
 
@@ -209,6 +207,13 @@ This is only useful if the remote even supports empty directories. If it does no
 
 Leave on `None` to let syncrclone decide based on whether or not the remote supports them.
 
+This may not work if there are filtered files in the directory. It will keep working and raise a warning.
+
+## Reducing Relisting (EXPERIMENTAL)
+
+As noted in the config file, syncrclone can avoid re-listing the remotes at the end by apply the actions to the file lists. This feature *should* work but it is experimental and likely has some untested edge cases. One know issue is that if using remotes with incompatible hashes and reusing hashing and tracking moves via hash, the move will not be able to be tracked on that remote. The end result is still a proper sync; just without move tracking.
+
+I do think this is the way to go in the future as it really is more efficient (even though there are some edge cases with file hashes). This is currently *not* the default but will be eventually barring some major revelation of a problem.
 
 ## Overriding Configs
 
@@ -219,5 +224,18 @@ if you usually have `reuse_hashesB = True` but you want to refresh them all, you
 
 and it will change the setting for this run only
 
+## Updating configs
 
+New versions may introduce new configuration options. They always have a sensible default but you may want to take advantage of them. The following is the process I follow to updat the configs. It is certainly not the *only* process.
+
+Let your config be at `/path/to/config/config.py`
+
+    $ cd /path/to/config/ 
+    $ syncrclone --new tmpnew.py
+    
+Then I open `config.py` and `tmpnew.py` side by side. I copy relevant sections *from* `config.py` to `tmpnew.py` and update the new config as needed. Then:
+
+    $ mv config.py config.py.BAK
+    $ mv tmpnew.py config.py
+    
 

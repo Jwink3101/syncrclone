@@ -68,8 +68,6 @@ class Config:
         self._config['__dir__'] = os.path.dirname(self._config['__file__'])
         self._config['__CPU_COUNT__'] = os.cpu_count()
         
-        
-        
         if not text:
             exec(self._template, self._config) # Only reset if reading
             with open(self._configpath,'rt') as file:
@@ -104,7 +102,7 @@ class Config:
         }
         for AB in 'AB':
             reqs[f'reuse_hashes{AB}'] = True,False
-            reqs[f'renames{AB}'] = 'size','mtime','hash','inode',None
+            reqs[f'renames{AB}'] = 'size','mtime','hash',None
             
         reqs['conflict_mode'] = ['tag',None]
         for mode in ('A','B','older','newer','smaller','larger'):
@@ -127,6 +125,11 @@ class Config:
         
         if skiplog:
             return 
+        
+        if self._config[f'avoid_relist']:
+            log(f'WARNING: avoid_relist is experimental. Use with caution.')
+            log(f'setting cleanup_empty_dirs to False')
+            #self._config[f'cleanup_empty_dirs{AB}'] = False # No need. Just ignored
         
         log(f"A: '{self.remoteA}'")
         log(f"B: '{self.remoteB}'")
@@ -192,6 +195,12 @@ def cli(argv=None):
         help=("Override any config option for this call only. Must be specified as "
               "'OPTION = VALUE', where VALUE should be properly shell escaped. "
               "Can specify multiple times. There is no input validation of any sort."))
+    parser.add_argument('--reset-state',action='store_true',
+        help=('Will reset the state of the sync pairs. This will assume the two have '
+              'not been synced and the end result is the UNION of the two remotes '
+              '(i.e. no delete propogation, all modified files look like conflicts, etc). '
+              'Also rehashes all files if applicable. It is best to run a regular sync '
+              'and then perform a reset.'))
     parser.add_argument('--version', action='version', version='syncrclone-' + __version__)
 
     if argv is None:

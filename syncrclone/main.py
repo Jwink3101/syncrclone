@@ -8,6 +8,9 @@ import tempfile
 from . import debug,log
 from . import utils
 from .rclone import Rclone
+from .dicttable import DictTable
+
+_TEST_AVOID_RELIST = False
 
 class LockedRemoteError(ValueError):
     pass
@@ -37,11 +40,11 @@ class SyncRClone:
         # Get file lists
         log('')
         log(f"Refreshing file list on A '{config.remoteA}'")
-        self.currA,self.prevA,emptyA0 = self.rclone.file_list(remote='A')   
+        self.currA,self.prevA = self.rclone.file_list(remote='A')   
         log(utils.file_summary(self.currA))
         
         log(f"Refreshing file list on B '{config.remoteB}'")
-        self.currB,self.prevB,emptyB0 = self.rclone.file_list(remote='B')
+        self.currB,self.prevB = self.rclone.file_list(remote='B')
         log(utils.file_summary(self.currB))
 
         self.check_lock()
@@ -74,7 +77,7 @@ class SyncRClone:
         
         if config.dry_run:
             self.summarize(dry=True)
-            self.rclone.run_shell(pre=False)
+            self.rclone.run_shell(pre=False) # has a --dry-run catch
             self.dump_logs()
             return
         
@@ -85,7 +88,7 @@ class SyncRClone:
             # select.select, will preclude (eventual?) windows support
             cont = input('Would you like to continue? Y/[N]: ')
             if not cont.lower().startswith('y'):
-                self.rclone.run_shell(pre=False)
+                self.rclone.run_shell(pre=False) # TODO: Consider if this should be here. Or should we always shell?
                 sys.exit()
         else:
             self.summarize(dry=False)  
@@ -126,37 +129,51 @@ class SyncRClone:
 
         # Update lists if needed
         log('')
-        if self.delA or self.backupA or self.movesA or self.transB2A:
-            log('Refreshing file list on A')
-            new_listA,_,emptyA1 = self.rclone.file_list(remote='A',prev_list=self.currA0)
-            log(utils.file_summary(new_listA))
-            self.rclone.push_file_list(new_listA,remote='A')
+        if self.config.avoid_relist:
+            log('Apply changes to file lists instead of refreshing')
+            new_listA,new_listB = self.avoid_relist()
         else:
-            log('No need to refresh file list on A. Updating current state')
-            # We still push this in case new things were hashed
-            emptyA1 = emptyA0
-            self.rclone.push_file_list(self.currA0,remote='A')
+            if self.delA or self.backupA or self.movesA or self.transB2A:
+                log('Refreshing file list on A')
+                new_listA,_ = self.rclone.file_list(remote='A',prev_list=self.currA0)
+                log(utils.file_summary(new_listA))
+            else:
+                log('No need to refresh file list on A')
+                new_listA = self.currA0
         
-        if self.delB or self.backupB or self.movesB or self.transA2B:
-            log('Refreshing file list on B')
-            new_listB,_,emptyB1 = self.rclone.file_list(remote='B',prev_list=self.currB0)
-            log(utils.file_summary(new_listB))
-            self.rclone.push_file_list(new_listB,remote='B')
-        else:
-            log('No need to refresh file list on B. Updating current state')
-            # We still push this in case new things were hashed
-            emptyB1 = emptyB0
-            self.rclone.push_file_list(self.currB0,remote='B')
-        
-        # Do empty dirs after final state since the state is *just* the files
+            if self.delB or self.backupB or self.movesB or self.transA2B:
+                log('Refreshing file list on B')
+                new_listB,_ = self.rclone.file_list(remote='B',prev_list=self.currB0)
+                log(utils.file_summary(new_listB))
+            else:
+                log('No need to refresh file list on B')
+                new_listB = self.currB0 
+            
         if config.cleanup_empty_dirsA or (config.cleanup_empty_dirsA is None and\
                                           self.rclone.empty_dir_support('A')): 
-            self.rclone.rmdirs('A',emptyA1 - emptyA0)
-            
+            emptyA = {os.path.dirname(f['Path']) for f in self.currA0} \
+                   - {os.path.dirname(f['Path']) for f in new_listA}
+            self.rclone.rmdirs('A',emptyA)
+        
         if config.cleanup_empty_dirsB or (config.cleanup_empty_dirsB is None and\
                                           self.rclone.empty_dir_support('B')): 
-            self.rclone.rmdirs('B',emptyB1 - emptyB0)
+            emptyB = {os.path.dirname(f['Path']) for f in self.currB0} \
+                   - {os.path.dirname(f['Path']) for f in new_listB}
+            self.rclone.rmdirs('B',emptyB)
         
+        
+        ######## For testing only
+        if _TEST_AVOID_RELIST:
+            re_listA,re_listB = self.avoid_relist()
+            with open('relists.json','wt') as fout:
+                json.dump({'A':list(new_listA),'B':list(new_listB),
+                           'rA':list(re_listA),'rB':list(re_listB)},fout)
+        ########
+               
+        log('Uploading filelists')
+        self.rclone.push_file_list(new_listA,remote='A')
+        self.rclone.push_file_list(new_listB,remote='B')
+
         if self.config.set_lock: # There shouldn't be a lock since we didn't set it so save the rclone call
             self.rclone.lock(breaklock=True)
 
@@ -235,7 +252,7 @@ class SyncRClone:
         debug(f'Printing Queueus {descr}')
         for attr in ['new','del','tag','backup','trans','moves']:
             for AB in 'AB':
-                BA = list(set('AB')- set(AB))[0]
+                BA = 'B' if AB == 'A' else 'A'
                 if attr == 'trans':
                     pa = f'{attr}{AB}2{BA}'
                 else:
@@ -251,24 +268,21 @@ class SyncRClone:
         commonPaths = set(file['Path'] for file in self.currA)
         commonPaths.intersection_update(file['Path'] for file in self.currB)
 
-        c = 0
+        delpaths = set()
         for path in commonPaths:
-
             q = {'Path':path}
             # We KNOW they exists for both
             fileA,fileB = self.currA[q],self.currB[q]
             if not self.compare(fileA,fileB):
                 continue
+            delpaths.add(path)
             
-            # Remove it from all lists
-            for obj in [self.currA,self.prevA,self.currB,self.prevB]:
-                try:
-                    obj.remove(q)
-                except ValueError: # not in a prev list
-                    continue
-            
-            c += 1
-        debug(f'Found {len(commonPaths)} common paths with {c} matching files')
+        for attr in ['currA','prevA','currB','prevB']:
+            new = DictTable([f for f in getattr(self,attr) if f['Path'] not in delpaths],
+                           fixed_attributes=['Path','Size','mtime'])
+            setattr(self,attr,new)
+        
+        debug(f'Found {len(commonPaths)} common paths with {len(delpaths)} matching files')
 
     def process_non_common(self):
         """
@@ -447,42 +461,45 @@ class SyncRClone:
         
         delOther = getattr(self,f'del{BA}') # On OTHER side -- list
         moveOther = getattr(self,f'moves{BA}') # on OTHER side - list
-
-        if rename_attrib == 'hash':
-            try:
-                # Note that this will not add it to all files but it isn't
-                # getting saved
-                utils.add_hash_compare_attribute(curr,prev) # adds 'common_hash'
-            except ValueError:
-                log(f'WARNING: Could not track moves on {AB} due to missing hashes')
-                return
-        elif rename_attrib == 'inode': # In case they were not indexed
-            curr.add_fixed_attribute('inode')
-            prev.add_fixed_attribute('inode')
         
+        # ALWAYS query size. This will cut out a lot of potential matches which
+        # is good since hash and mtime need to search. (We search on hash in case the
+        # do not always share a common one)
         for path in new[:]: # (1) Marked as new. Make sure to iterate a copy
             debug(f"Looking for moves on {AB}: '{path}'")
             currfile = curr[{'Path':path}]
+        
+            prevfiles = list(prev.query({'Size':currfile['Size']}))
             
-            # Build a query for previous files that always includes size and 
-            # optionally hash or inode. Then find all previous files based on 
-            # that. If mtime (or inode with implies mtime), check with tolerance 
+            # The mtime and hash comparisons are in loops but this is not too bad
+            # since the size check *greatly* reduces the size of the loops
             
-            query = {'Size':currfile['Size']}
-            if rename_attrib == 'hash':
-                query['common_hash'] = currfile.get('common_hash',None)
-            elif rename_attrib == 'inode':
-                query['inode'] = currfile['inode']
-            prevfiles = list(prev.query(query))
-            
-            if rename_attrib in ['mtime','inode']: # compare with tol. inode also checks mtime
+            # Compare time with tol.
+            if rename_attrib in ['mtime']:
                 prevfiles = [f for f in prevfiles if abs(f['mtime'] - currfile['mtime']) < config.dt]
+            
+            # Compare hashes one-by-one in case they're not all the same types
+            if rename_attrib == 'hash': 
+                _prevfiles = []
+                for prevfile in prevfiles:
+                    hcurr = currfile.get('Hashes',{})
+                    hprev = prevfile.get('Hashes',{})
+            
+                    # Just because there are common hashes, does *not* mean they are
+                    # all populated. e.g, it could be a blank string.
+                    # It is also possible for there to not be common hashes if the lists
+                    # were not refreshed
+                    common = {k for k,v in hcurr.items() if v.strip()}.intersection(\
+                              k for k,v in hprev.items() if v.strip())
+                    if common and all(hcurr[k] == hprev[k] for k in common):
+                        _prevfiles.append(prevfile)
+                prevfiles = _prevfiles # rename with the new lists
             
             if not prevfiles:
                 debug(f"No matches for '{path}' on {AB}")
                 continue
                 
-            if len(prevfiles) > 1: # TOTEST
+            if len(prevfiles) > 1:
                 log(f"Too many possible previous files for '{path}' on {AB}")
                 for f in prevfiles:
                     log(f"   '{f['Path']}'")
@@ -555,14 +572,15 @@ class SyncRClone:
         if compare == 'hash':
             h1 = file1.get('Hashes',{})
             h2 = file2.get('Hashes',{})
-            
+    
             # Just because there are common hashes, does *not* mean they are
-            # all populated. e.g, it could be a blank string
-            common = set(h1).intersection(h2)
-            all1 = all(h1[k] for k in common)
-            all2 = all(h2[k] for k in common)
-
-            if common and all1 and all2:
+            # all populated. e.g, it could be a blank string.
+            # It is also possible for there to not be common hashes if the lists
+            # were not refreshed
+            common = {k for k,v in h1.items() if v.strip()}.intersection(\
+                      k for k,v in h2.items() if v.strip())
+            
+            if common:
                 return all(h1[k] == h2[k] for k in common)
             
             if not common: 
@@ -591,7 +609,48 @@ class SyncRClone:
         return abs(file1['mtime'] - file2['mtime']) <= config.dt
 
 
+    def avoid_relist(self):
+        # actions: 'new','del','tag','backup','trans','moves'
+        # Care?:    N     Y     N     N        Y       Y
+        
+        # Actions must go first on both sides since we need tags before
+        # transfers
+        currA = self.currA0.copy()
+        currB = self.currB0.copy()
+        
+        for AB in 'AB':
+            if AB == 'A':
+                currAB,currBA,BA = currA,currB,'B'
+            else:
+                currAB,currBA,BA = currB,currA,'A'
+           
+        
+            for filename in getattr(self,f'del{AB}'):
+                currAB.remove(Path=filename)
+       
+            for filenameOLD,filenameNEW in getattr(self,f'moves{AB}'):
+                q = currAB.pop({'Path':filenameOLD})
+                q['Path'] = filenameNEW
+                currAB.add(q)
 
+        for AB in 'AB':    
+            if AB == 'A':
+                currAB,currBA,BA = currA,currB,'B'
+            else:
+                currAB,currBA,BA = currB,currA,'A'
+            
+            for filename in getattr(self,f'trans{BA}2{AB}'):
+                if filename.startswith('.syncrclone'): # We don't care about these
+                    continue
+                    
+                q = {'Path':filename}
+                if q in currAB: # Remove the old
+                    currAB.remove(q)
+                file = currBA[q]
+                #file['_copied'] = True # Set this so that on the next run, if using reuse_hashes, it is recomputed
+                currAB.add(file)
+
+        return currA,currB
 
 
 

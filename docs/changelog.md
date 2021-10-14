@@ -2,6 +2,18 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20211014.0.BETA
+
+This includes a lot including some breaking changes. Starting to feel like this may not be "beta" much longer. See the new section in [config tips](config_tips.md) for how to update.
+
+- Option to avoid re-listing a remote at the end of a sync. Since listing the remote can be a bottleneck, this is a big improvement. It is tested in some case but should be considered **experimental**. There are some untested edge cases and can break move tracking with `reuse_hashes`. Default is off! 
+    - May become default in the future.
+- Introduce a `--reset-state` flag to reset all file lists. This makes the sync look like a new one so it is better to run after a regular sync.
+- Empty directory cleanup added in `20210719.0.BETA` is reimplemented with a different algorithm that supports relisting. Still works but may have more cases where it *thinks* the directory is empty but it isn't. That will just not delete.
+- **Breaking Changes**:
+    - Removed inode support. It was a blocker to avoiding relisting and I think it isn't worth having since it is so outside of rclone.
+    - Removed legacy file list support. If you haven't run it in this long, it is worth using the new `--reset-state` anyway.
+
 ## 20210930.0.BETA
 
 - Adds the option to stop if there is an error in the pre/post shell script calls. 

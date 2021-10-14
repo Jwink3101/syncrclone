@@ -1,0 +1,11 @@
+FAILED test.py::test_backups[True-True] - TypeError: argument of type 'NoneType' is not iterable
+FAILED test.py::test_emptydir[True-True] - AssertionError: assert not True
+FAILED test.py::test_emptydir[True-False] - AssertionError: assert not True
+FAILED test.py::test_emptydir[True-None] - AssertionError: assert not True
+FAILED test.py::test_emptydir[False-True] - AssertionError: assert not True
+FAILED test.py::test_emptydir[False-None] - AssertionError: assert not True
+FAILED test.py::test_emptydir[None-True] - AssertionError: assert not True
+FAILED test.py::test_emptydir[None-False] - AssertionError: assert not True
+FAILED test.py::test_emptydir[None-None] - AssertionError: assert not True
+FAILED test.py::test_no_modtime[False-size-None-mtime-larger] - AssertionError: assert False == ((False or 'size' == 'mtime'
+FAILED test.py::test_prepost_error[True] - subprocess.CalledProcessError: Command '        echo "test" > tmp.txt

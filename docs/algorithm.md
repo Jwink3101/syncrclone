@@ -42,16 +42,15 @@ Do all of the above first. Then determine new, modified, and deleted. In practic
     
 ## Move Tracking
 
-Moves are only tracked if `renames{A/B}` is set. Options are `{size,mtime,hash,inode}` where the following are checked:
+Moves are only tracked if `renames{A/B}` is set. Options are `{size,mtime,hash}` where the following are checked:
 
 | Attribute | Actually compared |
 |-----------|-------------------|
 | size      | size              |
 | mtime     | size,mtime        |
-| hash      | hash              |
-| inode     | size,mtime,inode  |
+| hash      | size,hash         |
 
-Note: to compute inodes, the remote must be a local remote and syncrclone will add them.
+Hash doesn't really need size but it makes the comparison faster because of the loop needed to find common hashes amongst remotes.
 
 The move tracking algorithm *only* tracks if there have been no changes to the file (since unlike and rsync based tool, this one always does a full transfer). 
 

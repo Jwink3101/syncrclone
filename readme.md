@@ -8,15 +8,10 @@ syncrclone is in beta. It has been tested with a variety of backends but by no m
 
 In particular, things I am most uncertain about:
 
-* Windows Support -- I have no experience with Python and windows. I *tried* to be very cognizant of expected issues but it hasn't been tested in the slightest with Windows. Likely minor development is also needed (including a catch for adding inodes since they do not exist).
-* Links. syncrclone defers link handling to rclone but it may cause an issue. I know there is an issue with the `'inode'` options and links
-* Usefulness of logging. Too verbose? Not enough?
-* Automated runs and locks. I've tested the locking but not with constantly running (e.g. via crontab) and dealing with it
+* Windows Support -- I have no experience with Python and windows. I *tried* to be very cognizant of expected issues but it hasn't been tested in the slightest with Windows. Likely minor development is also needed.
+* Links. syncrclone defers link handling to rclone but it may cause an issue.
 * Clarity of the setup docs. This is hard for me to judge as I wrote it so I know what to expect. Is local mode clear?
-* Missing features?
-    * What is in scope and should be included?
-    * When to use `rclone_flags{A/B}`. Currently just listing and one-sides local-to-remote copies (e.g. file lists, non-transfer-actions, and logs). What about remote-to-remote?
-
+* The `avoid_relist` option. Currently experimental and off by default. Once I trust it and understand it better, should it be default to on?
 
 ## Features
 

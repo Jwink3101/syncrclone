@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from __future__ import unicode_literals
-# [git: list_dict_DB/] b2148b6023:dicttable.py (2020-08-25 10:30:26 -0600)
-__version__ = "20200825"
+
+__version__ = "20211010.0"
 __author__ = "Justin Winokur"
 
 import copy
@@ -22,10 +22,10 @@ class DictTable(object):
     Create an in-memeory single table DB from a list of dictionaries that may 
     be queried by any specified attribute.
 
-    This is useful since, once created, lookup/query/"in" checks areO(1), 
+    This is useful since, once created, lookup/query/"in" checks are O(1), 
     Creation is still O(N)
 
-    Note: Unless an entry is changed with update(), it must be reindexed
+    Note: Unless an entry is changed with update(), it must be reindexed!
 
     Inputs:
     --------
@@ -37,7 +37,7 @@ class DictTable(object):
         Specify _specific_ attributes to index for each item. Will *only* index
         them unless add_fixed_attribute('new_attribute') is called.
         
-        If None, will use _all_ attributed *except* those of exclude_attributes
+        If None, will use _all_ attributes *except* those of exclude_attributes
         
     exclude_attributes [ *empty* ] (list)
         Attributes that shouldn't ever be added even if attributes=None for 
@@ -167,6 +167,23 @@ class DictTable(object):
             return next(self.query(*args,**kwargs))
         except StopIteration:
             return None
+
+    def pop(self,*args,**kwargs):
+        """
+        Query, delete, and return item.
+        
+        Will raise a ValueError if more than one item will be deleted 
+        Will raise a KeyError if there is no item to delete. Does *NOT* support a default
+        """
+        ixs = self._ixs(*args,**kwargs)
+        if len(ixs) == 0:
+            raise KeyError('No matching query')
+        if len(ixs) > 1:
+            raise ValueError('Cannot `.pop()` more than one item`')
+        ix = ixs[0]
+        item = self._list[ix]
+        self._remove_ix(ix)
+        return item
 
     def count(self,*args,**kwargs):
         """
@@ -317,17 +334,19 @@ class DictTable(object):
         for ix in ixs[:]: # Must remove it from everything.
             # not sure what is happening, but it seems that I need to make a copy
             # since Python is doing something strange here...
-
-            item = self._list[ix]
-            for attrib in self.attributes:
-                if attrib in item:
-                    self._remove(attrib,item[attrib],ix)
-                
-            # Remove it from the list by setting to None. Do not reshuffle
-            # the indices. A None check will be performed elsewhere
-            self._list[ix] = None
-            self._ix.difference_update([ix])
-            self.N -= 1
+            self._remove_ix(ix)
+            
+    def _remove_ix(self,ix):
+        item = self._list[ix]
+        for attrib in self.attributes:
+            if attrib in item:
+                self._remove(attrib,item[attrib],ix)
+            
+        # Remove it from the list by setting to None. Do not reshuffle
+        # the indices. A None check will be performed elsewhere
+        self._list[ix] = None
+        self._ix.difference_update([ix])
+        self.N -= 1
     
     def copy(self):
         return DictTable(self,
@@ -369,7 +388,7 @@ class DictTable(object):
                 continue
             if isinstance(arg,dict):
                 for key,val in arg.items(): # Add it rather than update in case it is already specified
-                    kwargs[key].append(val)
+                    kwargs[key].append(val if not (isinstance(val,list) and len(val) == 0) else self._empty)
             else:
                 raise ValueError('unrecognized input of type {:s}'.format(str(type(arg))))
         
@@ -449,6 +468,7 @@ class DictTable(object):
         else:
             raise ValueError("Must specify DB[{'attribute':val}] or DB[index]'")
     __call__ = query
+    __delitem__ = remove
     
     def __iter__(self):
         return (item for item in self._list if item is not None)

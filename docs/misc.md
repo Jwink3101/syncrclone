@@ -16,31 +16,6 @@ Where `--keep` is optional but keeps the original file around. To convert back t
 
     $ xz A-name_fl.json
 
-### Legacy
-
-Pre 20210121.0, file lists were stored as a zlib-compressed json string.
-
-The files are UTF8 encoded JSON that is then zlib compressed and given as header `b'zipjson\x00\x00'`. The following python snippet will let you read this into a list and then back out.
-
-Read into a list called `files`
-
-```python
-import json,zlib
-HEADER = b'zipjson\x00\x00'
-
-with open('A-name_fl.zipjson','rb') as file:
-    file.seek(len(HEADER))
-    files = json.loads(zlib.decompress(file.read()))
-```
- 
-To write out to the new format, use the following simple snippet
-
-```python
-import json,lzma
-with lzma.open('A-name_fl.json.xz','wt') as file:
-    json.dump(files,file,ensure_ascii=False)
-```
-
 ## Optimized Actions
 
 There are essentially three (or two or four depending on how you count) actions besides transfers that we have to consider.

@@ -22,6 +22,7 @@ from syncrclone import set_debug
 import syncrclone.cli
 import syncrclone.utils
 import syncrclone.main
+from syncrclone.dicttable import DictTable
 
 # Make it return
 syncrclone.cli._RETURN = True
@@ -38,7 +39,7 @@ def exists(path):
     return bool(glob.glob(path))
 
 def get_MAIN_TESTS():
-    renamesA = renamesB = ('size','mtime','hash','inode') # Do not include None as we want to track them
+    renamesA = renamesB = ('size','mtime','hash') # Do not include None as we want to track them
     compares = ('size','mtime','hash')
     for renameA,renameB,compare in itertools.product(renamesA,renamesB,compares):
         yield 'A',renameA,'B',renameB,compare
@@ -59,7 +60,8 @@ MAIN_TESTS.extend(get_MAIN_TESTS())
 def test_main(remoteA,renamesA,
               remoteB,renamesB,
               compare,
-              interactive=False):
+              interactive=False,
+              ):
     """
     Main test with default settings (if the defaults change, this will need to
     be updated. A few minor changes from the defaults are also made
@@ -246,7 +248,37 @@ def test_main(remoteA,renamesA,
     
     os.chdir(PWD0)
 
-@pytest.mark.parametrize("attrib",('size','mtime','hash','inode',None))
+def test_avoid_relist():
+    """
+    Test avoiding the relist by calling test_main() with the different options and
+    comparing the lists at the end. The mtimes will be off but they should agree otherwise
+    """
+    try: # use try/finally to ensure it is *always* reset
+        syncrclone.main._TEST_AVOID_RELIST = True
+        test_main('A','hash','B','hash','hash')
+    finally:
+        syncrclone.main._TEST_AVOID_RELIST = False
+        
+    with open('testdirs/main/relists.json') as fin:
+        l = json.load(fin)
+        A,B,rA,rB = [DictTable(l[k],fixed_attributes=['Path','Size','mtime']) \
+                     for k in ['A', 'B', 'rA', 'rB']]
+    fA = {( f['Path'],f['Size']) for f in A if not f['Path'].startswith('.syncrclone')}
+    fB = {( f['Path'],f['Size']) for f in B if not f['Path'].startswith('.syncrclone')}    
+    rfA = {(f['Path'],f['Size']) for f in rA if not f['Path'].startswith('.syncrclone')}    
+    rfB = {(f['Path'],f['Size']) for f in rB if not f['Path'].startswith('.syncrclone')}    
+    assert fA == rfA
+    assert fB == rfB
+    
+    for Path,Size in fA:
+        q = dict(Path=Path,Size=Size)
+        assert abs(rA[q]['mtime'] - A[q]['mtime']) < 1
+    for Path,Size in fB:
+        q = dict(Path=Path,Size=Size)
+        assert abs(rB[q]['mtime'] - B[q]['mtime']) < 1
+    
+
+@pytest.mark.parametrize("attrib",('size','mtime','hash',None))
 def test_move_attribs(attrib):
     """
     Test moves over various conditions for each type of move tracking
@@ -261,7 +293,7 @@ def test_move_attribs(attrib):
     
     See Truth Table in the code
     
-    Only test with local A (as it supports inode). B doesn't matter since
+    Only test with local A. B doesn't matter since
     moves are only tracked on A.
     """
     remoteA = 'A'
@@ -316,10 +348,6 @@ def test_move_attribs(attrib):
         notmoved = ''    
     elif attrib == 'mtime':
         moved = '1234CD'
-        too_many = ''
-        notmoved = '5'
-    elif attrib == 'inode':
-        moved = '123CD4'
         too_many = ''
         notmoved = '5'
     elif attrib == 'hash':
@@ -867,53 +895,13 @@ def test_version_warning(version):
     # if different_version_match
     os.chdir(PWD0)
 
-@pytest.mark.parametrize("legA,legB",((0,1),(1,0),(1,1)))
-def test_legacy_filelist(legA,legB):
-    remoteA = 'A'
-    remoteB = 'B'
-    set_debug(False)   
-    
-    test = testutils.Tester('legacy_list',remoteA,remoteB)   
-    test.config.name = 'legacytest'
-    test.write_config()
-    
-    test.write_pre('A/fileADEL.txt','ADEL')
-    test.write_pre('A/fileSTAY.txt','STAY')
-    test.write_pre('A/fileBDEL.txt','BDEL')
-    
-    test.setup()
-    
-    os.remove('A/fileADEL.txt') # If we do not have the previous list, then it will copy back!
-    os.remove('B/fileBDEL.txt') # If we do not have the previous list, then it will copy back!
-    
-    # Convert the lists
-    def xz2zipjson(xz,zj):
-        HEADER = b'zipjson\x00\x00' 
-        with lzma.open(xz) as file:
-            files = json.load(file)
-        with open(zj,'wb') as file:
-            file.write(HEADER + zlib.compress(json.dumps(files,ensure_ascii=False).encode('utf8')))
-        os.unlink(xz)
-    
-    if legA:
-        xz2zipjson('A/.syncrclone/A-legacytest_fl.json.xz','A/.syncrclone/A-legacytest_fl.zipjson')
-    if legB:
-        xz2zipjson('B/.syncrclone/B-legacytest_fl.json.xz','B/.syncrclone/B-legacytest_fl.zipjson')    
-    
-    print('-='*40);print('=-'*40)
-    test.sync()
-    
-    # Compare
-    diffs = test.compare_tree()
-    assert not diffs
-    assert not exists('A/fileADEL.txt')
-    assert not exists('B/fileBDEL.txt')
-    
-    #test.sync() # Just to see if the log changed in manual testing
-    os.chdir(PWD0)
-
-@pytest.mark.parametrize("emptyA,emptyB",itertools.product([True,False,None],[True,False,None]))
-def test_emptydir(emptyA,emptyB):
+@pytest.mark.parametrize("emptyA,emptyB,avoid_relist",
+                         itertools.chain(itertools.product([True,False,None],
+                                                           [True,False,None],
+                                                           [False]),
+                                         [[True,True,True],[False,True,True],[True,False,True]]
+                                         ))
+def test_emptydir(emptyA,emptyB,avoid_relist):
     # Because of the nature of how I set up the tests with any other remote,
     # they can't be tested directly since it is compared against another sync
     # of the files.
@@ -927,6 +915,7 @@ def test_emptydir(emptyA,emptyB):
     test.config.filter_flags = ['--filter','- *.no']
     test.config.cleanup_empty_dirsA = emptyA
     test.config.cleanup_empty_dirsB = emptyB
+    test.config.avoid_relist = avoid_relist
     test.write_config()
     
     test.write_pre('A/move/move.txt','A') # Parents should delete
@@ -1215,14 +1204,56 @@ def test_cli_override():
 #     
     os.chdir(PWD0)
 
+def test_reset_state():
+    """
+    If the prior state was held, this would not be a conflict. But because it is
+    (on the second sync), we see a tag
+    """
+    remoteA = 'A'
+    remoteB = 'B'
+    set_debug(False)   
+    
+    test = testutils.Tester('reset_state',remoteA,remoteB)  
+    test.config.conflict_mode = 'tag' 
+    test.write_config()
+    
+    test.write_pre('A/fileA.txt','A')
+    test.write_pre('A/fileB.txt','B')
+    
+    test.setup()
+    
+    test.write_post('A/newA.txt','newA')
+    test.write_post('B/fileB.txt','modB',mode='at')
+    
+    test.sync()
+    assert test.compare_tree() == set() # Agree
+    assert not exists('A/fileB.*.B.txt') # Not tagged
+    assert not exists('A/fileB.*.A.txt')
+    assert exists('A/fileB.txt')
+    
+    # Same changes again but this time reset the state
+    test.write_post('A/newerA.txt','newA')
+    test.write_post('B/fileB.txt','modB again',mode='at')
+    
+    test.sync(['--reset-state'])
+    
+    assert test.compare_tree() == set() # Agree    
+    assert exists('A/fileB.*.B.txt')
+    assert exists('A/fileB.*.A.txt')
+    assert not exists('A/fileB.txt')
+    assert test.globread('A/fileB.*.A.txt') == 'BmodB'
+    assert test.globread('A/fileB.*.B.txt') == 'BmodBmodB again'
+          
+    os.chdir(PWD0)
+
 if __name__ == '__main__':
     test_main('A','mtime','B','hash','size') # Vanilla test covered below
-   
-#     test_main('A','inode','cryptB:','mtime','mtime')
+#    
 #     test_main('cryptA:','size','cryptB:','mtime','mtime')
 #     for remoteA,renamesA,remoteB,renamesB,compare in MAIN_TESTS:
 #         test_main(remoteA,renamesA,remoteB,renamesB,compare)        
-#     for attrib in ('size','mtime','hash','inode',None):
+#     test_avoid_relist()
+#     for attrib in ('size','mtime','hash',None):
 #         test_move_attribs(attrib)
 #     test_reuse_hash()    
 #     test_no_hashes()
@@ -1239,10 +1270,12 @@ if __name__ == '__main__':
 #     test_and_demo_exclude_if_present()
 #     for version in version_tests:
 #         test_version_warning(version)
-#     for legA,legB in ((0,1),(1,0),(1,1)):
-#         test_legacy_filelist(legA,legB)
-#     for emptyA,emptyB in itertools.product([True,False,None],[True,False,None]):    
-#         test_emptydir(emptyA,emptyB) 
+#     for emptyA,emptyB,avoid_relist in itertools.chain(itertools.product([True,False,None],
+#                                                                         [True,False,None],
+#                                                                         [False]),
+#                                                       [[True,True,True],[False,True,True],[True,False,True]]
+#                                                       ):    
+#         test_emptydir(emptyA,emptyB,avoid_relist) 
 #     for always,compare,renamesA,renamesB,conflict_mode in itertools.product([True,False],
 #                                                                             ['mtime','size'],
 #                                                                             ['mtime',None],
@@ -1257,7 +1290,7 @@ if __name__ == '__main__':
 #     for nomovesA,nomovesB in [(0,0),(1,0),(0,1),(1,1),(None,None)]:
 #         test_disable_moves(nomovesA,nomovesB)
 #     test_cli_override()
-    
+#     test_reset_state()
     
     # hacked together parser. This is used to manually test whether the interactive
     # mode is working
