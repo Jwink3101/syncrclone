@@ -128,8 +128,6 @@ class Config:
         
         if self._config[f'avoid_relist']:
             log(f'WARNING: avoid_relist is experimental. Use with caution.')
-            log(f'setting cleanup_empty_dirs to False')
-            #self._config[f'cleanup_empty_dirs{AB}'] = False # No need. Just ignored
         
         log(f"A: '{self.remoteA}'")
         log(f"B: '{self.remoteB}'")

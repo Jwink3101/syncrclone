@@ -11,7 +11,7 @@ In particular, things I am most uncertain about:
 * Windows Support -- I have no experience with Python and windows. I *tried* to be very cognizant of expected issues but it hasn't been tested in the slightest with Windows. Likely minor development is also needed.
 * Links. syncrclone defers link handling to rclone but it may cause an issue.
 * Clarity of the setup docs. This is hard for me to judge as I wrote it so I know what to expect. Is local mode clear?
-* The `avoid_relist` option. Currently experimental and off by default. Once I trust it and understand it better, should it be default to on?
+* The `avoid_relist` option. Currently experimental and off by default. Should it eventually the the default?
 
 ## Features
 

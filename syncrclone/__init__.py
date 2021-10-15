@@ -1,4 +1,4 @@
-__version__ = '20211014.0.BETA'
+__version__ = '20211015.0.BETA'
 LASTRCLONE = '1.56.2' # This is the last version I tested with. Does *NOT* mean it won't work further.
 
 import time
