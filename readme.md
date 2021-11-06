@@ -2,28 +2,21 @@
 
 Robust, Configurable, Bi-Directional sync between *any* two rclone remotes with automatic conflict resolution and backups.
 
-## Beta Note:
-
 syncrclone is in beta. It has been tested with a variety of backends but by no means all of them. And only has been real-world tested with a few. See [testing notes](docs/tests.md) for some details.
-
-In particular, things I am most uncertain about:
-
-* Windows Support -- I have no experience with Python and windows. I *tried* to be very cognizant of expected issues but it hasn't been tested in the slightest with Windows. Likely minor development is also needed.
-* Links. syncrclone defers link handling to rclone but it may cause an issue.
-* Clarity of the setup docs. This is hard for me to judge as I wrote it so I know what to expect. Is local mode clear?
-* The `avoid_relist` option. Currently experimental and off by default. Should it eventually the the default?
 
 ## Features
 
 * Configurable rename tracking even for remotes with incompatible hashes 
 * Configurable file comparison and conflict resolution. 
+    * Does **not** require ModTimes. Can use hashes or size for comparison (and move tracking)
 * Entirely non-interactive
-* All opperations that modify/delete files include a backup
+* All opperations that modify/delete files include a backup by default
 * Robust to interruption
-* Locking system
+* Optional Locking system
 * Dry-Run mode
 * Extensive tests
 * Directly uses rclone's powerful [filtering](https://rclone.org/filtering/)
+* Efficient when possible. Optionally avoids a second file-listing after synchronization. 
 
 ## Installation and Usage
 
@@ -114,7 +107,7 @@ Note that if `--exclude-if-present` is found in the `filter_flags`, a warning wi
 
 ## Non-ModTime comparisons and conflicts
 
-The default is to decide if files need to sync by comparing ModTime (or `mtime`). However, you can also compare by size (risky) or hash (robust).
+The default is to decide if files need to sync by comparing ModTime (or `mtime`). However, you can also compare by size or hash (robust).
 
 If you compare by size or hash, you can still resolve conflicts with modification time. Do note that not all remotes support ModTime and/or it may not be reliable. If using one of those types of remotes, do not use `newer`, `older`, or `newer_tag` conflict resolution. See [remote overview](https://rclone.org/overview/) for details.
 

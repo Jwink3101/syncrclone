@@ -116,7 +116,7 @@ def test_main(remoteA,renamesA,
     test.write_pre('A/delA modB.txt','delA but mod on B')
     test.write_pre('A/delB modA.txt','delB but mod on A')
     
-    test.write_pre('A/unic°de and space$.txt','UTF8')
+    test.write_pre('A/sub d‡r/unic°de and space$.txt','UTF8')
 
     test.write_pre('A/common_contentAfter0.txt','abc xyz')
     test.write_pre('A/common_contentAfter1.txt','abc xy')
@@ -167,7 +167,7 @@ def test_main(remoteA,renamesA,
     test.write_post('A/yes/newA.yes.no','New on A and no but yes')
     test.write_post('B/yes/newB.yes.no','New on B and no but yes')
     
-    test.write_post('B/unic°de and space$.txt','works',mode='at')
+    test.write_post('B/sub d‡r/unic°de and space$.txt','works',mode='at')
     
     # These don't need to be tested other than not showing a diff
     test.write_post('A/common_contentAfter1.txt','abc xyz')
@@ -243,8 +243,8 @@ def test_main(remoteA,renamesA,
     assert exists('A/yes/newA.yes.no')
     assert exists('A/yes/newB.yes.no')
 
-    assert test.read('A/unic°de and space$.txt') == 'UTF8works'
-    assert exists('A/.syncrclone/backups/*_A/uni*.txt'),'did not back up'
+    assert test.read('A/sub d‡r/unic°de and space$.txt') == 'UTF8works'
+    assert exists('A/.syncrclone/backups/*_A/sub d‡r/unic°de and space$.txt'),'did not back up'
     
     os.chdir(PWD0)
 

@@ -1,0 +1,204 @@
+#!/usr/bin/env python
+# coding: utf-8
+"""
+Delete files and purge directories based on the date for rclone remotes.
+
+Pattern should be a glob pattern with at least one wildcard. If multiple wildcards are used, 
+the algorithm will use the longest capure that return a parseable date. 
+The extraction process is heuristic and may not always work. Use `--dry-run` to test
+
+Additional arguments are passed to rclone
+"""
+import time
+from datetime import datetime
+import tempfile
+import subprocess
+import shlex
+import operator
+import json
+import fnmatch
+import re
+import sys,os
+from concurrent.futures import ThreadPoolExecutor
+import argparse
+
+__version__ = '20211101.0'
+
+now = datetime.now()
+
+epilog = """\
+Note that files are deleted using `rclone delete` and directories are
+deleted using `rclone purge`. Be careful and test with `--dry-run` as needed
+"""
+
+parser = argparse.ArgumentParser(            
+    description=__doc__,
+    epilog=epilog,
+    formatter_class=argparse.RawDescriptionHelpFormatter)
+
+parser.add_argument('--days',default=30,type=int,
+    help='[%(default)s] Specify the number of days to keep')
+
+parser.add_argument('--dry-run',action='store_true',
+    help='Display the captured items and exit')
+
+parser.add_argument('--rclone-exe',default='rclone',
+    help='[%(default)s] rclone executable')
+
+parser.add_argument('-t','--threads',default=1,type=int,
+    help='[%(default)s] How many threads to use for directory purges. Does not apply to file deletes')
+
+parser.add_argument('-v','--verbose',action='count', default=0,
+    help='Verbosity level: -v: what is being deleted, -vv: what has a date but too new, -vvv: all files')
+
+parser.add_argument('remote',
+    help=('Speciy the path to the rclone remote. Will only look at that directory ONLY and '
+          'will not recurse'))
+          
+parser.add_argument('pattern',
+    help=('Specify a glob-like matching patterns where at least one wild-card is present and '
+          'represents the date block. If more than one wildcard exist, will try to heuristically determine '
+          'which is the date. It may not always work. Use `--dry-run` to see what will be deleted and `--dry-run -vv`'
+          'to see all matches'))
+
+parser.add_argument('--version', action='version', 
+    version='%(prog)s-' + __version__)
+    
+args,rcloneargs = parser.parse_known_args()
+if args.dry_run:
+    args.verbose = max([args.verbose,1])
+
+# [git: NBweb2/] d9a8e01d0b:NBweb2/utils.py (2021-03-15 13:57:10 -0600)
+def dateparser(datestr):
+    """
+    Attempt to parse dates based on a dictionary of possible formats.
+    It is *not* perfect
+
+    Heuristic matching algorithm:
+    
+    Note: formats are sorted by longest to shortest as a proxy for
+          more specific (e.g. includes seconds, to just year). This can either
+          be done ahead of time or can be (re) computed each time (as done here
+          at a cost of about 130µs)
+          
+      * Convert all punctuation to spaces
+      * If the input is shorter than the format's output, skip
+      * If the input is longer than the format's output, truncate the input to the size
+        of the output and try to match
+          * Important to have the fmts sorted so more specific gets matched
+      * Break at first match
+    
+    Gotchas: Do *not* just replace all punctuation with nothing since it will be hard to tell
+             if, for example, 201103 could be March 2011 or it could be November 3, 2020
+    """
+    # Recall all formats will should not have punctuatuon
+    fmts = [
+        '%Y %m %d T %H %M %S' , '%Y %m %d %H %M %S' , '%Y %m %d %H%M%S' ,
+        '%y %m %d %H %M %S'   , '%Y%m%d %H %M %S'   , '%Y %m %dT%H%M%S' ,
+        '%Y %m %d %H %M'      , '%Y %m %d %H%M'     , '%Y%m%d %H%M%S'   ,
+        '%y %m %d %H%M%S'     , '%y%m%d %H %M %S'   , '%Y%m%d %H %M'    ,
+        '%y %m %d %H %M'      , '%Y%m%d%H%M%S'      , '%Y %m %d %H'     ,
+        '%Y%m%d %H%M'         , '%y%m%d %H%M%S'     , '%y %m %d %H%M'   ,
+        '%y%m%d%H%M%S'        , '%y%m%d %H %M'      , '%Y%m%d%H%M'      ,
+        '%Y%m%d %H'           , '%y%m%d %H%M'       , '%y %m %d %H'     ,
+        '%y%m%d%H%M'          , '%Y %m %d'          , '%y%m%d %H'       ,
+        '%y %m %d'            , '%Y%m%d'            , '%Y %m'           ,
+        '%y%m%d'              , '%Y%m'              , '%y %m'           ,
+        '%y%m'                , '%Y'                , '%y'              ]
+    
+    fmts = [(fmt,len(now.strftime(fmt))) for fmt in fmts]
+    fmts.sort(key=operator.itemgetter(1),reverse=True)
+
+    for punc in ''',.:;"'!?[](){}-_@#$^&*T''':
+        datestr = datestr.replace(punc,' ').strip()
+    datestr = re.sub('\s{2,}',' ',datestr).strip() # Remove multiple spaces
+    
+    for fmt,N in fmts:
+        if len(datestr) < N:
+            continue # Will never work
+
+        # Try to match with the input truncated to the output length
+        try:
+            return datetime.strptime(datestr[:N],fmt)     
+        except ValueError:
+            pass
+
+args.rclone_exe = shlex.split(args.rclone_exe)
+
+# Get files  
+ 
+cmd = args.rclone_exe + ['lsjson','--no-mimetype','--no-modtime',
+       args.remote] + rcloneargs
+items = json.loads(subprocess.check_output(cmd))
+items.sort(key=lambda item:item['Path'].lower())
+
+
+# Translate the pattern to regex and then replace .* with (.*). Note that
+# since this escapes everything, no need for lookbehinds. A `.*` is only
+# going to be a match.
+repattern = fnmatch.translate(args.pattern).replace('.*','(.*)')
+if args.verbose:
+    print('Looking at items:')
+
+todel = []
+for item in items:
+    try:
+        match = re.search(repattern,item['Name'],flags=re.IGNORECASE)
+        if not match: raise IndexError
+        
+        # Try to parse a date
+        dates = [(g,dateparser(g)) for g in match.groups()]
+        dates = [d for d in dates if d[1]] # Remove Nones
+        # Sort for the longest string
+        dates.sort(key=lambda d:-len(d[0]))
+        date = dates[0]
+    except IndexError:
+        if args.verbose >= 3:
+            print(f"  {shlex.quote(item['Name'])}. No date found")
+        continue    
+    
+    days = (now - date[1]).days
+    if days > args.days:
+        todel.append(item)
+        if args.verbose >= 1:
+            print(f"  {shlex.quote(item['Name'])}. Matched '{date[0]}' ({days} days) {'' if not args.dry_run else 'DRY-RUN '}DELETE")
+    elif args.verbose >= 2:
+            print(f"  {shlex.quote(item['Name'])}. Matched '{date[0]}' ({days} days) KEEP")
+
+if args.dry_run:
+    sys.exit()
+
+delfiles,deldirs = [],[]
+for item in todel:
+    if item['IsDir']:
+        deldirs.append(item['Path'])
+    else:
+        delfiles.append(item['Path'])
+
+if delfiles:
+    # Delete can be done with a single call using `--files-from`
+    if args.verbose:
+        print('Deleting Files')
+    with tempfile.NamedTemporaryFile(mode='wt',delete=False) as delist:
+        delist.write('\n'.join(delfiles))
+
+    cmd = args.rclone_exe + ['--files-from',delist.name,'delete',args.remote] +\
+           rcloneargs + ['-v' for _ in range(args.verbose)]
+    subprocess.call(cmd)
+
+def purge(dirpath):
+    # Purges cannot be batched so do them with threads below
+    rem = os.path.join(args.remote,dirpath)
+    cmd = args.rclone_exe + ['purge',rem] + rcloneargs
+    subprocess.call(cmd)
+    if args.verbose >=1:
+        return f'Purged {shlex.quote(rem)}'
+
+if deldirs:
+    if args.verbose:
+        print('Deleting Directories')
+    with ThreadPoolExecutor(max_workers=args.threads) as pool:
+        for res in pool.map(purge,deldirs):
+            if res:
+                print(res)
+
