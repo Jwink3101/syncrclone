@@ -19,7 +19,6 @@ It is *always* executed the same as if you did
     
 This is important to note when using local mode as rclone will be evaluated in the `.syncrclone` directory.
 
-
 ## Attribute Settings
 
 Setting the different attributes depend largely on the remotes. These are some tips but it will likely require playing around a little bit.
@@ -214,6 +213,23 @@ This may not work if there are filtered files in the directory. It will keep wor
 As noted in the config file, syncrclone can avoid re-listing the remotes at the end by apply the actions to the file lists. This feature *should* work but it is experimental and likely has some untested edge cases. One know issue is that if using remotes with incompatible hashes and reusing hashing and tracking moves via hash, the move will not be able to be tracked on that remote. The end result is still a proper sync; just without move tracking.
 
 I do think this is the way to go in the future as it really is more efficient (even though there are some edge cases with file hashes). This is currently *not* the default but will be eventually barring some major revelation of a problem.
+
+## Specified work directories (EXPERIMENTAL)
+
+By default, syncrclone will put all backups, logs, and filelists in `<remoteA/B>/.syncrclone`. However, it is possible to instead put them in a totally different directory **as long as it does not overlap `<remoteA/B>`. The only option to overlap `<remoteA/B>` is to use `None` (i.e. the defaults). Otherwise, they must be totally independant.
+
+For example:
+
+
+| Remote   | workdir                       | Acceptable | comment                                                                            |
+|----------|-------------------------------|------------|------------------------------------------------------------------------------------|
+| `A:`     | `None` (i.e. `A:.syncrclone`) | Yes        | Only acceptable overlap                                                            |
+| `A:sync` | `A:back`                      | Yes        | Both on `A` but do not overlap                                                     |
+| `A:`     | `A:work`                      | **No**     | Overlap of `A:work` and `A:`                                                       |
+| `A:`     | `B:work`                      | Yes        | Store everything on `B:`. Make sure the other remote doesn't overlap either though |
+
+
+**Note**: syncrclone will try to warn for overlaps but may miss some if using aliases. This will result in an unexpected failure. Also not compatible with `sync_backups`
 
 ## Overriding Configs
 

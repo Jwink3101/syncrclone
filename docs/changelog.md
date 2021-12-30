@@ -2,6 +2,16 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20211229.0.BETA
+
+* Adds the (experimental) option to specify different (non-overlapping) locations to store backups, logs, and previous state (`workdir`). This allows for remotes to not show `.syncrclone` if desired and to store filelists locally or on a different cloud remote.
+    * See [config tips](config_tips.md) for caveats and where it doesn't work.
+    * See #6 for other ideas
+* Changed `log_dest` to `save_logs` and will put them in the respective workdir
+* Locks are still around but are *only* checked with also being set.
+* Change to file-transfer flags to minimize transferring everything again on any single failure. This *shouldn't* change anything (and all tests still pass) but please let me know of any cases where that doesn't work.
+* Allow the specification of a list for pre/post shell. This gives more control to specify commands without escaping, etc.
+
 ## 20211014.0.BETA
 
 This includes a lot including some breaking changes. Starting to feel like this may not be "beta" much longer. See the new section in [config tips](config_tips.md) for how to update.

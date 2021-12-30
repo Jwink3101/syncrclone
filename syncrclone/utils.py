@@ -144,7 +144,32 @@ def search_upwards(pwd):
     return search_upwards(newpwd)
         
         
-            
+def pathjoin(*args):
+    """
+    This is like os.path.join but does some rclone-specific things because there could be
+    a ':' in the first part.
+    
+    The second argument could be '/file', or 'file' and the first could have a colon.
+        pathjoin('a','b')   # a/b
+        pathjoin('a:','b')  # a:b
+        pathjoin('a:','/b') # a:/b
+        pathjoin('a','/b')  # a/b  NOTE that this is different
+    """
+    if len(args) <= 1:
+        return ''.join(args)
+    
+    root,first,rest = args[0],args[1],args[2:]
+    
+    if root.endswith('/'):
+        root = root[:-1]
+    
+    if root.endswith(':') or first.startswith('/'):
+        path = root + first
+    else:
+        path = f'{root}/{first}' 
+    
+    path = os.path.join(path,*rest)
+    return path           
 
         
         

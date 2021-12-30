@@ -12,9 +12,6 @@ from .dicttable import DictTable
 
 _TEST_AVOID_RELIST = False
 
-class LockedRemoteError(ValueError):
-    pass
-
 class SyncRClone:
     def __init__(self,config,break_lock=None):
         """
@@ -23,12 +20,15 @@ class SyncRClone:
         """
         self.now = time.strftime("%Y-%m-%dT%H%M%S", time.localtime())
         self.now_compact = self.now.replace('-','')
-        
+    
         self.config = config
         self.config.now = self.now # Set it there to be used elsewhere
+        
+        # Set workdir and workdir0
+        
         self.rclone = Rclone(self.config)
         
-        self.rclone.run_shell(pre=True)
+        self.run_shell(pre=True)
 
         if break_lock:
             if self.config.dry_run:
@@ -46,10 +46,11 @@ class SyncRClone:
         log(f"Refreshing file list on B '{config.remoteB}'")
         self.currB,self.prevB = self.rclone.file_list(remote='B')
         log(utils.file_summary(self.currB))
-
-        self.check_lock()
-        if self.config.set_lock and not config.dry_run: # no lock for dry-run since we won't change anything
-            self.rclone.lock()
+        
+        if config.set_lock:
+            self.rclone.check_lock()
+            if not config.dry_run: # no lock for dry-run since we won't change anything
+                self.rclone.lock()
         
         # Store the original "curr" list as the prev list for speeding
         # up the hashes. Also used to tag checking.
@@ -77,7 +78,7 @@ class SyncRClone:
         
         if config.dry_run:
             self.summarize(dry=True)
-            self.rclone.run_shell(pre=False) # has a --dry-run catch
+            self.run_shell(pre=False) # has a --dry-run catch
             self.dump_logs()
             return
         
@@ -88,7 +89,7 @@ class SyncRClone:
             # select.select, will preclude (eventual?) windows support
             cont = input('Would you like to continue? Y/[N]: ')
             if not cont.lower().startswith('y'):
-                self.rclone.run_shell(pre=False) # TODO: Consider if this should be here. Or should we always shell?
+                self.run_shell(pre=False) # TODO: Consider if this should be here. Or should we always shell?
                 sys.exit()
         else:
             self.summarize(dry=False)  
@@ -113,9 +114,9 @@ class SyncRClone:
         # are on *both* systems. Only del and backup lists add to the backup.
         # Keep as part of the single transfer
         if config.backup and config.sync_backups:
-            self.transA2B.extend(os.path.join(self.rclone.backup_path0['A'],f) 
+            self.transA2B.extend(os.path.join('.syncrclone',self.rclone.backup_path0['A'],f) 
                 for f in self.delA + self.backupA)
-            self.transB2A.extend(os.path.join(self.rclone.backup_path0['B'],f) 
+            self.transB2A.extend(os.path.join('.syncrclone',self.rclone.backup_path0['B'],f) 
                 for f in self.delB + self.backupB)
             
         # Perform final transfers
@@ -177,12 +178,12 @@ class SyncRClone:
         if self.config.set_lock: # There shouldn't be a lock since we didn't set it so save the rclone call
             self.rclone.lock(breaklock=True)
 
-        self.rclone.run_shell(pre=False)            
+        self.run_shell(pre=False)            
         self.dump_logs()
 
     
     def dump_logs(self):
-        if not self.config.local_log_dest and not self.config.log_dest:
+        if not self.config.local_log_dest and not self.config.save_logs:
             log('Logs are not being saved')
             return
         
@@ -191,8 +192,8 @@ class SyncRClone:
         # log these before dumping
         if self.config.local_log_dest:
             log(f"Logs will be saved locally to '{os.path.join(self.config.local_log_dest,logname)}'")
-        if self.config.log_dest:
-            log(f"Logs will be saved on remotes to '{os.path.join(self.config.log_dest,logname)}'")
+        if self.config.save_logs:
+            log(f"Logs will be saved on workdirs to {logname}")
         
         tfile =  os.path.join(self.rclone.tmpdir,'log')
         log.dump(tfile)
@@ -203,9 +204,9 @@ class SyncRClone:
             except OSError: pass
             shutil.copy2(tfile,dest)
         
-        if self.config.log_dest:
-            self.rclone.copylog('A',tfile,os.path.join(self.config.log_dest,logname))
-            self.rclone.copylog('B',tfile,os.path.join(self.config.log_dest,logname))
+        if self.config.save_logs:
+            self.rclone.copylog('A',tfile,logname)
+            self.rclone.copylog('B',tfile,logname)
                 
     def summarize(self,dry=False):
         """
@@ -538,26 +539,7 @@ class SyncRClone:
         
         trans.extend(new)
     
-    def check_lock(self,remote='both',error=True):
-       # import ipdb;ipdb.set_trace()
-        AB = remote
-        if remote == 'both':
-            locks = [] # Get BOTH before errors
-            locks.extend(self.check_lock(remote='A',error=False))
-            locks.extend(self.check_lock(remote='B',error=False))
-        else:        
-            curr = getattr(self,f'curr{AB}')
-            locks = curr.query(curr.Q.filter(lambda a:a['Path'].startswith('.syncrclone/LOCK')))
-            locks = [f'{AB}:{os.path.relpath(l["Path"],".syncrclone/LOCK/")}' for l in locks]
     
-        if not error:
-            return locks
-        
-        if locks:
-            msg = ['Remote(s) locked:']
-            for lock in locks:
-                msg.append(f'  {lock}')
-            raise LockedRemoteError('\n'.join(msg))
             
     def compare(self,file1,file2):
         """Compare file1 and file2 (may be A or B or curr and prev)"""
@@ -652,7 +634,43 @@ class SyncRClone:
 
         return currA,currB
 
-
+    def run_shell(self,pre=None):
+        """Run the shell commands"""
+        import subprocess
+        cmds = self.config.pre_sync_shell if pre else self.config.post_sync_shell
+        if not cmds:
+            return
+        log('')
+        log('Running shell commands')
+        prefix = "DRY RUN " if self.config.dry_run else ""
+        if isinstance(cmds,str):            
+            for line in cmds.split('\n'):
+                log(f'{prefix}$ {line}')
+            shell=True
+        else:
+            log(f'{prefix}{cmds}')
+            shell=False
+        
+        if self.config.dry_run:
+            return log('DRY-RUN: NOT RUNNING')
+            
+        proc = subprocess.Popen(cmds,
+                                shell=shell,
+                                stderr=subprocess.PIPE,
+                                stdout=subprocess.PIPE)
+        
+        out,err = proc.communicate()
+        out,err = out.decode(),err.decode()
+        for line in out.split('\n'):
+            log(f'STDOUT: {line}')
+        
+        if err.strip():    
+            for line in err.split('\n'):
+                log(f'STDERR: {line}')
+        if proc.returncode > 0:
+            log(f'WARNING: Command return non-zero returncode: {proc.returncode}')
+            if self.config.stop_on_shell_error:
+                raise subprocess.CalledProcessError(proc.returncode, cmds)
 
 
 

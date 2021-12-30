@@ -59,18 +59,23 @@ class Tester:
         self.config.parse()
         self.config.rclone_env['RCLONE_CONFIG'] = 'rclone.cfg'
         
+        
     def write_config(self):
-         self.config.local_log_dest = 'logs/'
-         with open(self.config._configpath,'wt') as file:
+        self.config.local_log_dest = 'logs/'
+        with open(self.config._configpath,'wt') as file:
             for key,var in self.config._config.items():
                 if key.startswith('_'): continue
                 
                 file.write(f'{key} = {repr(var)}\n')
+        # Use this opportunity to reset workdirs
+        self.wdA = 'wdA' if self.config.workdirA else 'A/.syncrclone'
+        self.wdB = 'wdB' if self.config.workdirB else 'B/.syncrclone'
+        
         
     def setup(self,**kwargs):
         """Sync A --> B then A --> remoteA and B --> remoteB"""
         exe = self.config.rclone_exe
-        call([exe,'sync','A/','B/']) # No special flags 
+        call([exe,'sync','A/','B/'],env=self.config.rclone_env) # No special flags 
 
         if self.remoteA != 'A':
             call([exe,'purge'] + \
@@ -80,7 +85,15 @@ class Tester:
             call([exe,'purge'] + \
                   self.config.rclone_flags + self.config.rclone_flagsB + \
                   [self.remoteB],env=self.config.rclone_env)   
-
+        if self.config.workdirA:
+            call([exe,'purge'] + \
+                  self.config.rclone_flags + self.config.rclone_flagsA + \
+                  [self.config.workdirA],env=self.config.rclone_env) 
+        if self.config.workdirB:
+            call([exe,'purge'] + \
+                  self.config.rclone_flags + self.config.rclone_flagsB + \
+                  [self.config.workdirB],env=self.config.rclone_env) 
+        
         return self.sync(**kwargs)
     
     def sync(self,flags=None,configpath='config.py'):
@@ -105,6 +118,7 @@ class Tester:
             self.synclogs.append(file.readlines())
        
         # remote to local (pull)
+        
         if self.remoteA != 'A':
             call([exe,'sync'] + \
                   self.config.rclone_flags + self.config.rclone_flagsA + \
@@ -113,6 +127,16 @@ class Tester:
             call([exe,'sync'] + \
                   self.config.rclone_flags + self.config.rclone_flagsB + \
                   [self.remoteB,'B/'],env=self.config.rclone_env)           
+        
+        if self.config.workdirA:
+            call([exe,'sync'] + \
+                  self.config.rclone_flags + self.config.rclone_flagsA + \
+                  [self.config.workdirA,self.wdA],env=self.config.rclone_env) 
+        if self.config.workdirB:
+            call([exe,'sync'] + \
+                  self.config.rclone_flags + self.config.rclone_flagsB + \
+                  [self.config.workdirB,self.wdB],env=self.config.rclone_env) 
+        
         os.chdir(self.pwd)
         return syncobj
     

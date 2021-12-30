@@ -26,6 +26,18 @@ This is *ALWAYS* evaluated from the parent of this file.
 remoteA = "<<MUST SPECIFY>>"
 remoteB = "<<MUST SPECIFY>>"
 
+# (ADVANCED USAGE) Specify where to store past file lists, backups, logs, locks, etc.
+# This value must be either:
+#   None   : (Default) Stored internal to the remote at remote{A/B}:.syncrclone
+#   string : Specify an alternative location (either same remote or not) which
+#            DOES NOT OVERLAP with the remote. The only acceptable overlap is when
+#            set to None.
+#
+# Note that overlap is tested but isn't perfect in the case of alias remotes. May cause
+# issues later in the sync!  Not compatible with sync_backups
+workdirA = None # <remoteA>/.syncrclone
+workdirB = None # <remoteB>/.syncrclone
+
 # Names are needed so that one directory can sync to OR from multiple
 # locations. Names should be unique. The default below is randomly
 # set.
@@ -125,12 +137,14 @@ reuse_hashesB = False
 always_get_mtime = True 
 
 # When backups are set, all overwrites or deletes will instead be backed up (moved into
-# the .syncrclone folder)
+# the workdir folder)
 backup = True
 
 # Specify whether to also sync the backed up files between A and B. If True,
 # both remotes will have all of the backups. If False, each remote will only
-# have what it backed up on the respective side
+# have what it backed up on the respective side.
+#
+# Not compatible with specified workdirs
 sync_backups = False
 
 # Some remotes do not support hashes at all (e.g crypt) while others do not 
@@ -144,8 +158,7 @@ hash_fail_fallback = None # {'size','mtime',None}
 # locks. They are only for syncrclone.
 #
 # They are not strictly needed and require extra rclone calls. As such, they 
-# can be disabled. Note even if setting locks if disabled, syncrclone will
-# still respect them!
+# can be disabled. If disabled, will also NOT respect them from other calls
 set_lock = False
 
 # While transfers will follow the respective rclone flags  (e.g. ['--transfers','10'], 
@@ -200,14 +213,11 @@ renamesB = None
 
 # All output is printed to stdout and stderr but this can also be saved and
 # uploaded to a remote. Note that the last upload step will not be in the logs
-# themselves. The log name is fixed as '{name}_{date}.log' but the path
-# can be set. Note that the `.syncrclone` folder is always excluded if you do not
-# wish to also track the logs, though it can be helpful. Especially if there
-# is more than one syncpair
+# themselves. The log name is fixed as '{name}_{date}.log' 
 #
 # Can also specify a local location. Useful if both remotes are remote. Recall
 # that the paths are relative to this file. If blank, will not save logs
-log_dest = '.syncrclone/logs' # Relative to root of each remote
+save_logs = True
 local_log_dest = '' # NOT on a remote
 
 ## Pre- and Post-run
@@ -215,6 +225,8 @@ local_log_dest = '' # NOT on a remote
 # these are all run from the directory of this config (as with everything else).
 # STDOUT and STDERR will be captured. Note that there is no validation or 
 # security of the inputs. These are not actually called if using dry-run.
+#
+# If specified as a list, will run directly with subprocess. Otherwise uses shell=True
 pre_sync_shell = ""
 post_sync_shell = ""
 

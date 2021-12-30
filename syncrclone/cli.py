@@ -126,8 +126,30 @@ class Config:
         if skiplog:
             return 
         
-        if self._config[f'avoid_relist']:
-            log(f'WARNING: avoid_relist is experimental. Use with caution.')
+        if self._config['avoid_relist']:
+            log('WARNING: avoid_relist is experimental. Use with caution.')
+        if self._config.get('log_dest',False):
+            log('WARNING: log_dest is deprecated and ignored. See `save_logs`')
+        
+        # verify non-overlap of remotes. Not perfect
+        for AB in 'AB':
+            workdir = self._config[f'workdir{AB}']
+            remote = self._config[f'remote{AB}']
+            
+            if not workdir:
+                continue
+            workdir = os.path.abspath(workdir) if ':' not in workdir else workdir
+            remote = os.path.abspath(remote) if ':' not in remote else remote
+
+            if not os.path.relpath(workdir.replace(':','/'),
+                                   remote.replace(':','/')).startswith('../'): 
+                raise ConfigError('Cannot have overlapping workdir and remote')
+        
+        if any(self._config[f'workdir{AB}'] for AB in 'AB'):
+            if self._config['sync_backups']:
+                raise ConfigError('Cannot have sync_backups with specified workdirs')
+            log(f'WARNING: specified workdirs is experimental. Use with caution.')
+            
         
         log(f"A: '{self.remoteA}'")
         log(f"B: '{self.remoteB}'")
@@ -243,6 +265,7 @@ def cli(argv=None):
             raise ConfigError(f"config file '{cliconfig.configpath}' does not exist")
     
         config.parse() # NOTE: This now changes where the entire program is executed to the path of that file!
+        
         if cliconfig.override:
             for item in cliconfig.override:
                 log(f'CLI Override: {item}')
@@ -254,6 +277,14 @@ def cli(argv=None):
         
         for key,val in vars(cliconfig).items():
             setattr(config,key,val)
+        
+        # Reset workdir
+        for AB in 'AB':
+            workdir = getattr(config,f'workdir{AB}')
+            setattr(config,f'workdir0{AB}',workdir)
+            if not workdir:
+                setattr(config,f'workdir{AB}',utils.pathjoin(getattr(config,f'remote{AB}'),'/.syncrclone'))
+        
         
         debug('config:',config)
         r = SyncRClone(config,break_lock=config.break_lock)

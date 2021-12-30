@@ -1,0 +1,20 @@
+X Log Locations (`log_dest`) -- WIP
+X Locks
+
+X Filelists:
+X    - Pull
+X    - Push
+X    - Know it exists?
+
+X Actions:
+    * X Delete w/ backup
+    * X Backup
+    
+Tests:
+X    - Update main from function
+X    - Update main in __main__
+X    - Test for no .syncrclone dirs
+X    - Test for non-local remotes. (need to update tools? Maybe sync them back too?)
+    - Overlapping remote error
+    - Tricked overlapping remote test
+

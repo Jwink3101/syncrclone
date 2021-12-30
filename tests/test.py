@@ -9,7 +9,7 @@ import glob
 import time
 import warnings
 import re
-import zlib,lzma,json
+import zlib,lzma,json,subprocess
 
 import testutils
 
@@ -39,28 +39,48 @@ def exists(path):
     return bool(glob.glob(path))
 
 def get_MAIN_TESTS():
+    # All combinations of compares and renames. All local
     renamesA = renamesB = ('size','mtime','hash') # Do not include None as we want to track them
     compares = ('size','mtime','hash')
     for renameA,renameB,compare in itertools.product(renamesA,renamesB,compares):
-        yield 'A',renameA,'B',renameB,compare
-
-MAIN_TESTS = []
-MAIN_TESTS.append(['cryptA:','mtime','B','hash','mtime']) # To also test the construction of remote tests
-
-# Adds 48 combinations. For something more reasonable,comment this out and inclde the following:
-MAIN_TESTS.extend(get_MAIN_TESTS()) 
-# MAIN_TESTS.extend([
+        yield ('A',renameA,None,
+               'B',renameB,None,
+               compare)
+    
+    # Now test with specified workdirs. Can just use any rename
+    yield 'A','size','Awork','B','size','Bwork','size'
+    yield 'A','size',None,'B','size','Bwork','size'
+    yield 'A','size','Awork','B','size',None,'size'
+    
+    # Test with some crypts (as a test for non-local). Use mtimes
+    yield 'cryptA:','mtime',None,'B','mtime',None,'size'
+    yield 'A','mtime',None,'cryptB:','mtime',None,'size'
+    yield 'cryptA:','mtime',None,'cryptB:','mtime',None,'size'
+    
+    # Crypts with specified workdirs
+    yield 'cryptA:main','mtime','cryptA:wd','B','mtime',None,'size'
+    yield 'A','mtime',None,'cryptB:main','mtime','cryptB:wd','size'
+    yield 'cryptA:main','mtime','cryptA:wd','cryptB:main','mtime','cryptB:wd','size'
+    yield 'cryptA:main','mtime','cryptB:wdA','cryptB:main','mtime','cryptA:wdB','size' # Mix ?
+    
+    
+    
+MAIN_TESTS = list(get_MAIN_TESTS()) 
+# MAIN_TESTS = [ ## TODO Update
 #     ['A','hash','B','hash','hash'], # Most secure
 #     ['A','hash','B','hash','mtime'], # Good compare when no common hash
 #     ['A','size','B','size','size'], # Most easily tricked but will still work on this test
 # ])
     
 
-@pytest.mark.parametrize("remoteA,renamesA,remoteB,renamesB,compare",MAIN_TESTS)
-def test_main(remoteA,renamesA,
-              remoteB,renamesB,
+@pytest.mark.parametrize(("remoteA,renamesA,workdirA,"
+                          "remoteB,renamesB,workdirB,"
+                          "compare"),MAIN_TESTS)
+def test_main(remoteA,renamesA,workdirA,
+              remoteB,renamesB,workdirB,
               compare,
               interactive=False,
+              debug=False,
               ):
     """
     Main test with default settings (if the defaults change, this will need to
@@ -69,7 +89,7 @@ def test_main(remoteA,renamesA,
     More edge cases and specific settings are played with later
     
     """
-    set_debug(False)
+    set_debug(debug)
     print(remoteA,remoteB)
     test = testutils.Tester('main',remoteA,remoteB)
     
@@ -88,6 +108,10 @@ def test_main(remoteA,renamesA,
     
     test.config.log_dest = 'logs/'    
     test.config.name='main'
+    
+    test.config.workdirA = workdirA
+    test.config.workdirB = workdirB
+    
     test.write_config()
     
     ## Initial files
@@ -113,6 +137,8 @@ def test_main(remoteA,renamesA,
 
     test.write_pre('A/delA.txt','delete on A')
     test.write_pre('A/delB.txt','delete on B')
+    test.write_pre('A/del in dir1/del on B.txt','will delete on B')
+    test.write_pre('A/del in dir2/del on A.txt','will delete on A')
     test.write_pre('A/delA modB.txt','delA but mod on B')
     test.write_pre('A/delB modA.txt','delB but mod on A')
     
@@ -124,8 +150,9 @@ def test_main(remoteA,renamesA,
     test.write_pre('A/common_contentBefore0.txt','ABC XYZ')
     test.write_pre('A/common_contentBefore1.txt','ABC XYZ')
 
+    flags = ['--debug'] if debug else []
     ## Run
-    test.setup()
+    test.setup(flags=flags)
 
     ## Modify
     test.write_post('A/EditOnA.txt','Edited on A',mode='at')
@@ -159,6 +186,9 @@ def test_main(remoteA,renamesA,
     test.write_post('B/delA modB.txt','mod on B',mode='at')
     os.remove('A/delA modB.txt')
     
+    os.remove('B/del in dir1/del on B.txt')
+    os.remove('A/del in dir2/del on A.txt')
+
     test.write_post('A/newA.txt','New on A')
     test.write_post('B/newB.txt','New on B')
     
@@ -176,7 +206,7 @@ def test_main(remoteA,renamesA,
     print('-='*40)
     print('=-'*40)
     args = ['--interactive'] if interactive else []
-    obj = test.sync(args)
+    obj = test.sync(flags=args + flags)
     
     ## Confirm!
     print('-'*100)
@@ -193,8 +223,8 @@ def test_main(remoteA,renamesA,
     assert test.read('A/EditOnB.txt') == 'Edit on BEdited on B',"mod did not propogate"
     assert not exists('A/EditOnA.txt.*'),'Should NOT have been tagged'
     assert not exists('A/EditOnB.txt.*'),'Should NOT have been tagged'
-    assert test.globread('B/.syncrclone/backups/*_B/EditOnA.txt') == 'Edit on A','not backed up'
-    assert test.globread('A/.syncrclone/backups/*_A/EditOnB.txt') == 'Edit on B','not backed up'
+    assert test.globread(os.path.join(test.wdB,'backups/*_B/EditOnA.txt')) == 'Edit on A','not backed up'
+    assert test.globread(os.path.join(test.wdA,'backups/*_A/EditOnB.txt')) == 'Edit on B','not backed up'
         
     # Moves w/o edit
     assert not exists('A/MoveOnB.txt')
@@ -224,13 +254,13 @@ def test_main(remoteA,renamesA,
     assert exists('A/EditOnBoth_Anewer.*.B.txt'), "Not tagged"
     assert exists('A/EditOnBoth_Bnewer.*.A.txt'), "Not tagged"
 
-    
     assert test.read('B/MovedEditedOnBoth_Bnewer.txt').endswith('BB')
     
     assert not exists('A/delA.txt')
     assert not exists('A/delB.txt')
-    assert exists('A/.syncrclone/backups/*_A/delB.txt'), "did not backup"
-    assert exists('B/.syncrclone/backups/*_B/delA.txt'), "did not backup"
+    
+    assert exists(os.path.join(test.wdA,'backups/*_A/delB.txt')), "did not backup (delB)"
+    assert exists(os.path.join(test.wdB,'backups/*_B/delA.txt')), "did not backup (delA)"
 
     assert exists('A/delB modA.txt') # Should not have been deleted
     assert "DELETE CONFLICT: File 'delB modA.txt' deleted on B but modified on A. Transfering" in stdout
@@ -244,7 +274,13 @@ def test_main(remoteA,renamesA,
     assert exists('A/yes/newB.yes.no')
 
     assert test.read('A/sub d‡r/unic°de and space$.txt') == 'UTF8works'
-    assert exists('A/.syncrclone/backups/*_A/sub d‡r/unic°de and space$.txt'),'did not back up'
+    assert exists(os.path.join(test.wdA,'backups/*_A/sub d‡r/unic°de and space$.txt')),'did not back up unicode'
+    
+    assert exists(os.path.join(test.wdA,'A-main_fl.json.xz'))
+    assert exists(os.path.join(test.wdB,'B-main_fl.json.xz'))
+    
+    assert exists('A/.syncrclone/') is (False if workdirA else True)
+    assert exists('B/.syncrclone/') is (False if workdirB else True)
     
     os.chdir(PWD0)
 
@@ -255,7 +291,7 @@ def test_avoid_relist():
     """
     try: # use try/finally to ensure it is *always* reset
         syncrclone.main._TEST_AVOID_RELIST = True
-        test_main('A','hash','B','hash','hash')
+        test_main('A','hash',None,'B','hash',None,'hash')
     finally:
         syncrclone.main._TEST_AVOID_RELIST = False
         
@@ -582,13 +618,14 @@ def test_dry_run():
     os.chdir(PWD0)
     
 def test_logs():
-    remoteA = 'cryptA:'
+    remoteA = 'cryptA:Main'
     remoteB = 'B'
     set_debug(False)   
     
     test = testutils.Tester('logs',remoteA,remoteB)   
     test.config.renamesA = 'mtime'
-    test.config.log_dest = 'logs'
+    test.config.save_logs = True
+    test.config.workdirA = 'cryptA:Work'
     test.write_config()
     
     test.write_pre('A/file','0')
@@ -605,14 +642,16 @@ def test_logs():
     stdout = ''.join(test.synclogs[-1])
     
     assert test.compare_tree() == set() # Will includes logs
-    logs = sorted(glob.glob('A/logs/*'))
-    assert len(logs) == 2, "should have two. setup + sync"
+    logsA = sorted(glob.glob('wdA/logs/*'))
+    assert len(logsA) == 2, "should have two. setup + sync"
+    
+    logsB = sorted(glob.glob('B/.syncrclone/logs/*'))
+    assert {os.path.basename(l) for l in logsA} == {os.path.basename(l) for l in logsB}, 'A and B are not the same'
     
     # We know from all of the other tests that stdout (above) works otherwise
     # they would fail. So just check that it's the same
-    with open(logs[-1]) as f:
+    with open(logsA[-1]) as f:
         f.read().strip() == stdout.strip()
-    
     
     os.chdir(PWD0)
 
@@ -685,17 +724,44 @@ def test_three_way():
     assert test.compare_tree(A='A',B='C') == {('disagree', 'file3.txt')}
 
     os.chdir(PWD0)
-    
-def test_locks():
+
+LOCKTESTS = list(itertools.product(('A','cryptA:main'),(None,'cryptA:wd'),
+                                   ('B','cryptB:main'),(None,'cryptB:wd')))
+
+@pytest.mark.parametrize("remoteA,workdirA,remoteB,workdirB",LOCKTESTS)
+def test_locks(remoteA,workdirA,remoteB,workdirB):
     """
     Tests locking and breaking the lock
     """
-    remoteA,remoteB = 'A','B'
     test = testutils.Tester('locks',remoteA,remoteB)
+    test.config.workdirA = workdirA
+    test.config.workdirB = workdirB
     
-    ## Config
+    test.config.set_lock = True
+    test.config.name='name'
     test.write_config()
+
+    def set_lock():
+        """
+        Need to do it semi-manually for non A/ B/ remotes because the
+        initial sync of the files will break it. ONLY do this in those cases
+        """
+        sync.rclone.lock()
     
+        # Before testing again make sure it follows workdir settings
+        # and/or set lock manually
+        if test.config.workdirA: 
+            assert not os.path.exists('A/.syncrclone/LOCK/LOCK_name')
+        else:
+            test.write_post('A/.syncrclone/LOCK/LOCK_name','man')
+            
+        if test.config.workdirB: 
+            assert not os.path.exists('B/.syncrclone/LOCK/LOCK_name')
+        else:
+            test.write_post('B/.syncrclone/LOCK/LOCK_name','man')
+    
+    
+    # setup
     test.write_pre('A/file1.txt','file1')
     
     sync = test.setup()
@@ -703,49 +769,53 @@ def test_locks():
     test.write_post('B/file1.txt','mod',mode='at')
     
     # Set the lock
-    sync.rclone.lock()
-    
-    # Try to sync. Note this is done with --debug so it will raise
-    # errors. Test this even if configured not to set a lock
-    test.config.set_lock = False
-    test.write_config()
-
-    with pytest.raises(syncrclone.main.LockedRemoteError):
+    set_lock()
+    with pytest.raises(syncrclone.rclone.LockedRemoteError):
         test.sync(['--debug'])
-
-    test.config.set_lock = True
-    test.write_config()
     
     # break the lock on both then sync
     test.sync(['--break-lock','both','--debug'])
-    test.sync(['--debug']) # SHoudl work
+    test.sync(['--debug']) # Should work
 
     # Edit the file then set the lock again. Then test breaking each one
     test.write_post('A/file1.txt','mod again',mode='at')
     
     # Set the lock
-    sync.rclone.lock()    
+    set_lock()    
     
-    with pytest.raises(syncrclone.main.LockedRemoteError):
+    with pytest.raises(syncrclone.rclone.LockedRemoteError):
         test.sync(['--debug'])
     
-    test.sync(['--break-lock','A','--debug'])
-    with pytest.raises(syncrclone.main.LockedRemoteError):
+    # Break it
+    test.sync(['--break-lock','both','--debug'])
+    test.sync(['--debug']) # Make sure can sync
+    
+    # Set the lock manually. Only do this for all locals
+    if (remoteA,workdirA,remoteB,workdirB) == ('A', None, 'B', None):
+        test.sync(['--break-lock','both','--debug'])
+        
+        test.write_post('A/.syncrclone/LOCK/LOCK_name','')
+        with pytest.raises(syncrclone.rclone.LockedRemoteError):
+            test.sync(['--debug']) 
+        test.sync(['--break-lock','A','--debug'])
         test.sync(['--debug'])
         
-    test.sync(['--break-lock','B','--debug'])
-    test.sync(['--debug']) # Should work
-    
-    
-    # Finally, make sure the error, even with --debug, is appropriate for
-    # "breaking" what isn't locked
-    try:
-        os.rmdir('B/.syncrclone/LOCK/')
-    except OSError:
-        pass
+        test.write_post('B/.syncrclone/LOCK/LOCK_name','')
+        with pytest.raises(syncrclone.rclone.LockedRemoteError):
+            test.sync(['--debug'])
+        test.sync(['--break-lock','B','--debug'])
+        test.sync(['--debug'])
         
-    test.sync(['--break-lock','B','--debug'])
-    
+        # Make sure breaking one doesn't break the other
+        test.write_post('A/.syncrclone/LOCK/LOCK_name','')
+        test.write_post('B/.syncrclone/LOCK/LOCK_name','')
+        with pytest.raises(syncrclone.rclone.LockedRemoteError):
+            test.sync(['--debug'])
+        test.sync(['--break-lock','B','--debug'])
+        with pytest.raises(syncrclone.rclone.LockedRemoteError):
+            test.sync(['--debug'])
+        test.sync(['--break-lock','A','--debug'])
+        test.sync(['--debug'])
 
     os.chdir(PWD0)
 
@@ -1042,9 +1112,9 @@ def test_prepost_script(dry):
         echo pretest $myvarPRE
         echo eee 1>&2
         """ 
-    test.config.post_sync_shell  = """\
+    test.config.post_sync_shell  = ['/bin/bash','-c',"""\
         myvarPOST=post-test
-        echo posttest $myvarPOST""" 
+        echo posttest $myvarPOST"""]
 
     test.write_config()
     
@@ -1059,8 +1129,7 @@ def test_prepost_script(dry):
     assert '$         myvarPRE=pre-test' in log
     assert '$         echo pretest $myvarPRE' in log
     assert '$         echo eee 1>&2' in log
-    assert '$         myvarPOST=post-test' in log
-    assert '$         echo posttest $myvarPOST' in log
+    assert "['/bin/bash', '-c'," in log
     
     if dry:
         assert 'STDOUT: pretest pre-test' not in log
@@ -1246,12 +1315,41 @@ def test_reset_state():
           
     os.chdir(PWD0)
 
+def test_workdir_overlap():
+    # Just call main on some test cases
+    
+    # This should be caught internally and raise ConfigError.
+    with pytest.raises(syncrclone.cli.ConfigError):
+        test_main('aliasA1:','mtime','aliasA1:aa',
+                  'B','size',None,
+                  'size',debug=True) 
+                  
+    # This will NOT be caught as the aliases hide the true remotes from syncrclone
+    with pytest.raises(subprocess.CalledProcessError) as cc:    
+        test_main('aliasA1:','mtime','aliasA2:',
+                  'B','size',None,
+                  'size',debug=True) 
+    assert cc.value.returncode == 7,"wrong err type" # https://rclone.org/docs/#exit-code
+
+
+
 if __name__ == '__main__':
-    test_main('A','mtime','B','hash','size') # Vanilla test covered below
-#    
-#     test_main('cryptA:','size','cryptB:','mtime','mtime')
-#     for remoteA,renamesA,remoteB,renamesB,compare in MAIN_TESTS:
-#         test_main(remoteA,renamesA,remoteB,renamesB,compare)        
+#     test_main('A','mtime',None,
+#           'B','hash',None,
+#           'size') # Vanilla test covered below
+
+
+#     test_main('cryptA:AA','mtime','cryptA:A',
+#               'B','hash',None,
+#               'size') # Vanilla test covered below
+#     test_main('cryptA:AA','mtime','cryptB:Aw',
+#               'cryptB:BB','size','cryptA:Bw',
+#               'size') # Vanilla test covered below
+# 
+#     for (remoteA,renamesA,workdirA,
+#          remoteB,renamesB,workdirB,
+#          compare) in MAIN_TESTS:
+#         test_main(remoteA,renamesA,workdirA,remoteB,renamesB,workdirB,compare)        
 #     test_avoid_relist()
 #     for attrib in ('size','mtime','hash',None):
 #         test_move_attribs(attrib)
@@ -1264,7 +1362,8 @@ if __name__ == '__main__':
 #     test_dry_run()
 #     test_logs()
 #     test_three_way()
-#     test_locks()
+#     for remoteA,workdirA,remoteB,workdirB in LOCKTESTS:
+#         test_locks(remoteA,workdirA,remoteB,workdirB)
 #     test_local_mode()
 #     test_redacted_PW_and_modules_in_config_file()
 #     test_and_demo_exclude_if_present()
@@ -1291,6 +1390,7 @@ if __name__ == '__main__':
 #         test_disable_moves(nomovesA,nomovesB)
 #     test_cli_override()
 #     test_reset_state()
+#     test_workdir_overlap()
     
     # hacked together parser. This is used to manually test whether the interactive
     # mode is working
