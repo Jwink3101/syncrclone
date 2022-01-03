@@ -2,6 +2,10 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20220202.0.BETA
+
+- Adds stats to the final log and populates the `$STATS` environment variable in the post shell. Useful for setting up notifications or the like.
+
 ## 20211229.0.BETA
 
 * Adds the (experimental) option to specify different (non-overlapping) locations to store backups, logs, and previous state (`workdir`). This allows for remotes to not show `.syncrclone` if desired and to store filelists locally or on a different cloud remote.

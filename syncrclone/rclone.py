@@ -7,6 +7,7 @@ from collections import deque,defaultdict
 import subprocess,shlex
 import lzma
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from . import debug,log
@@ -33,6 +34,8 @@ class Rclone:
         self.config = config
         self.add_args = [] # logging, etc
         self.tmpdir = tempfile.TemporaryDirectory().name
+        
+        self.rclonetime = 0.0
         
         try:
             os.makedirs(self.tmpdir)
@@ -87,7 +90,8 @@ class Rclone:
             stderr = tempfile.NamedTemporaryFile(delete=False)
             bufsize = -1
             universal_newlines = False
-            
+        
+        t0 = time.time()
         proc = subprocess.Popen(cmd,
                                 stdout=stdout,
                                 stderr=stderr,
@@ -105,6 +109,7 @@ class Rclone:
             err = '' # Piped to stderr
         
         proc.wait()
+        self.rclonetime += time.time() - t0
         
         if not stream:
             stdout.close()

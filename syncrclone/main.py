@@ -18,6 +18,7 @@ class SyncRClone:
         Main sync object. If break_lock is not None, will *just* break the
         locks
         """
+        self.t0 = time.time()
         self.now = time.strftime("%Y-%m-%dT%H%M%S", time.localtime())
         self.now_compact = self.now.replace('-','')
     
@@ -120,12 +121,12 @@ class SyncRClone:
                 for f in self.delB + self.backupB)
             
         # Perform final transfers
-        sumA = utils.file_summary([self.currA.query_one(Path=f) for f in self.transA2B])
-        log('');log(f'A >>> B {sumA}')
+        self.sumA = utils.file_summary([self.currA.query_one(Path=f) for f in self.transA2B])
+        log('');log(f'A >>> B {self.sumA}')
         self.rclone.transfer('A2B',self.transA2B)
         
-        sumB = utils.file_summary([self.currB.query_one(Path=f) for f in self.transB2A])
-        log('');log(f'A <<< B {sumB}')
+        self.sumB = utils.file_summary([self.currB.query_one(Path=f) for f in self.transB2A])
+        log('');log(f'A <<< B {self.sumB}')
         self.rclone.transfer('B2A',self.transB2A)
 
         # Update lists if needed
@@ -170,6 +171,7 @@ class SyncRClone:
                 json.dump({'A':list(new_listA),'B':list(new_listB),
                            'rA':list(re_listA),'rB':list(re_listB)},fout)
         ########
+        self.new_listA,self.new_listB = new_listA,new_listB
                
         log('Uploading filelists')
         self.rclone.push_file_list(new_listA,remote='A')
@@ -178,7 +180,10 @@ class SyncRClone:
         if self.config.set_lock: # There shouldn't be a lock since we didn't set it so save the rclone call
             self.rclone.lock(breaklock=True)
 
-        self.run_shell(pre=False)            
+        self.stats()
+
+        self.run_shell(pre=False)  
+        for line in self.stats().split('\n'):log(line)          
         self.dump_logs()
 
     
@@ -538,9 +543,7 @@ class SyncRClone:
             trans.append(dest) # moves happen before transfers!
         
         trans.extend(new)
-    
-    
-            
+                
     def compare(self,file1,file2):
         """Compare file1 and file2 (may be A or B or curr and prev)"""
         config = self.config
@@ -653,9 +656,13 @@ class SyncRClone:
         
         if self.config.dry_run:
             return log('DRY-RUN: NOT RUNNING')
+        
+        env = os.environ.copy()
+        if not pre: env['STATS'] = self.stats()
             
         proc = subprocess.Popen(cmds,
                                 shell=shell,
+                                env=env,
                                 stderr=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
         
@@ -672,6 +679,17 @@ class SyncRClone:
             if self.config.stop_on_shell_error:
                 raise subprocess.CalledProcessError(proc.returncode, cmds)
 
-
-
+    def stats(self):
+        txt = [f'A >>> B {self.sumA} | A <<< B {self.sumB}']
+        attrnames = [('New','new'),
+                     ('Deleted','del'),
+                     ('Tagged','tag'),
+                     ('Backed Up','backup'),
+                     ('Moved','moves')]
+        txt.append('A: ' + ' | '.join(f'{name} {len(getattr(self,attr + "A"))}' 
+                                      for name,attr in attrnames))
+        txt.append('B: ' + ' | '.join(f'{name} {len(getattr(self,attr + "B"))}' 
+                                      for name,attr in attrnames))
+        txt.append(f'Time: {time.time() - self.t0:0.2f}s (rclone {self.rclone.rclonetime:0.2f}s)')              
+        return '\n'.join(txt)
 

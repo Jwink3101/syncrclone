@@ -227,6 +227,9 @@ local_log_dest = '' # NOT on a remote
 # security of the inputs. These are not actually called if using dry-run.
 #
 # If specified as a list, will run directly with subprocess. Otherwise uses shell=True
+#
+# The _post_ shell call also has "$STATS" defined which prints the run statistics.
+# The timing will be different than that of the final log as it is run sooner.
 pre_sync_shell = ""
 post_sync_shell = ""
 
