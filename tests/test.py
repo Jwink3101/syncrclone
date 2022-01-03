@@ -1136,12 +1136,12 @@ def test_prepost_script(dry):
     if dry:
         assert 'STDOUT: pretest pre-test' not in log
         assert 'STDOUT: posttest post-test' not in log
-        assert 'A: New 0 | Deleted 0 | Tagged 0 | Backed Up 0 | Moved 0' not in log
+        assert 'A: New 0 | Deleted 0 | Backed Up 0 | Moved 0' not in log
         assert 'STDERR: eee' not in log
     else:
         assert 'STDOUT: pretest pre-test' in log
         assert 'STDOUT: posttest post-test' in log 
-        assert 'A: New 0 | Deleted 0 | Tagged 0 | Backed Up 0 | Moved 0' in log
+        assert 'A: New 0 | Deleted 0 | Backed Up 0 | Moved 0' in log
         assert 'STDERR: eee' in log    
         
     os.chdir(PWD0)
@@ -1386,8 +1386,8 @@ if __name__ == '__main__':
 #                                                                             ['newer','larger']):
 #         
 #         test_no_modtime(always,compare,renamesA,renamesB,conflict_mode)
-    test_prepost_script(False)
-    test_prepost_script(True)
+#     test_prepost_script(False)
+#     test_prepost_script(True)
 #     test_prepost_error(True)
 #     test_prepost_error(False)
 #     for nomovesA,nomovesB in [(0,0),(1,0),(0,1),(1,1),(None,None)]:

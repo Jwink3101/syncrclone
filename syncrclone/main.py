@@ -83,7 +83,7 @@ class SyncRClone:
             self.dump_logs()
             return
         
-        # Perform deletes, backups, and moves
+        # summarize also sets the syncstats dict used by stats() below
         if config.interactive:
             self.summarize(dry=None) 
             # I may add a timeout in the future but the  easiest method, 
@@ -94,6 +94,8 @@ class SyncRClone:
                 sys.exit()
         else:
             self.summarize(dry=False)  
+        
+        ## Perform deletes, backups, and moves
         
         # Do actions. Clear the backup list if not using rather than keep around.
         # This way, we do not accidentally transfer it if not backed up
@@ -217,6 +219,7 @@ class SyncRClone:
         """
         dry can be True, False, or None where None is to show the planned
         """
+        self.syncstats = syncstats = {}
         if dry is True:
             tt = '(DRY RUN) '
             log(tt.strip())
@@ -228,19 +231,22 @@ class SyncRClone:
             raise ValueError() # Just in case I screw up later
         
         attr_names = {'del':'Delete (with{} backup)'.format('out' if not self.config.backup else ''),
-                      'backup':'Backup'}
+                      'backup':'Backup','new':'New'}
         if not self.config.backup:
             attr_names['backup'] = "Will overwrite (w/o backup)"
             
         for AB in 'AB':
             log('')
             log(f"Actions queued on {AB}:")
-            for attr in ['del','backup','moves']:
-                for file in getattr(self,f'{attr}{AB}'):
+            for attr in ['del','backup','moves','new']:
+                files = getattr(self,f'{attr}{AB}')
+                syncstats[f'{attr}{AB}'] = len(files)
+                for file in files:
                     if attr == 'moves':
                         log(f"{tt}Move on {AB}: '{file[0]}' --> '{file[1]}'")
                     else:
                         log(f"{tt}{attr_names.get(attr,attr)} on {AB}: '{file}'")
+            
         if dry is False:
             return
         
@@ -683,7 +689,7 @@ class SyncRClone:
         txt = [f'A >>> B {self.sumA} | A <<< B {self.sumB}']
         attrnames = [('New','new'),
                      ('Deleted','del'),
-                     ('Tagged','tag'),
+                     #('Tagged','tag'),
                      ('Backed Up','backup'),
                      ('Moved','moves')]
         txt.append('A: ' + ' | '.join(f'{name} {len(getattr(self,attr + "A"))}' 

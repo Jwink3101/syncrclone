@@ -2,6 +2,13 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20220103.0.BETA
+
+Minor 
+
+- Fixed stats reporting that was off from changing internal lists.
+- Corrected date for version (it's January, not February).
+
 ## 20220202.0.BETA
 
 - Adds stats to the final log and populates the `$STATS` environment variable in the post shell. Useful for setting up notifications or the like.
