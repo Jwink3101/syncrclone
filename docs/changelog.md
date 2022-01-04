@@ -2,6 +2,10 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20220103.1.BETA
+
+- Add `$LOGNAME` to the shell variables and an example of using a notification
+
 ## 20220103.0.BETA
 
 Minor 

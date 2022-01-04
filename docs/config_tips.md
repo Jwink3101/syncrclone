@@ -208,6 +208,24 @@ Leave on `None` to let syncrclone decide based on whether or not the remote supp
 
 This may not work if there are filtered files in the directory. It will keep working and raise a warning.
 
+## Pre- and Post- Shell
+
+It is possible to have syncrclone runs some shell scripts. This is useful for sending notifications when finished (such as with Pushbullet, Pushover, Teculus Push, etc). 
+
+For the *post* run, `$STATS` defines with run statistics (with the timing being off slightly since it is not the final) and `$LOGNAME` is the final log file name. (Note that the logfile has not *yet* been dumped but will be soon.)
+
+The following is an example of using macOS notifications after having installed [terminal-notifier](https://github.com/julienXX/terminal-notifier)
+
+```python
+post_sync_shell = """
+terminal-notifier \
+    -title "syncrclone Done" \
+    -subtitle "MACHINE" \
+    -message "$STATS" \
+    -open "file://$PWD/logs/$LOGNAME"
+""".replace('MACHINE',name) # use a dynamic name 
+```
+
 ## Reducing Relisting (EXPERIMENTAL)
 
 As noted in the config file, syncrclone can avoid re-listing the remotes at the end by apply the actions to the file lists. This feature *should* work but it is experimental and likely has some untested edge cases. One know issue is that if using remotes with incompatible hashes and reusing hashing and tracking moves via hash, the move will not be able to be tracked on that remote. The end result is still a proper sync; just without move tracking.

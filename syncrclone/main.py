@@ -24,6 +24,7 @@ class SyncRClone:
     
         self.config = config
         self.config.now = self.now # Set it there to be used elsewhere
+        self.logname = f"{self.config.name}_{self.now}.log"
         
         # Set workdir and workdir0
         
@@ -194,7 +195,7 @@ class SyncRClone:
             log('Logs are not being saved')
             return
         
-        logname = f"{self.config.name}_{self.now}.log"
+        logname = self.logname
         
         # log these before dumping
         if self.config.local_log_dest:
@@ -665,6 +666,7 @@ class SyncRClone:
         
         env = os.environ.copy()
         if not pre: env['STATS'] = self.stats()
+        env['LOGNAME'] = self.logname
             
         proc = subprocess.Popen(cmds,
                                 shell=shell,
