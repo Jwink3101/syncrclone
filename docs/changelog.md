@@ -2,6 +2,13 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20220204.0.BETA
+
+Minor fixes and improvements.
+
+- Changes handling of rclone response during transfer in case of errant bytes. See #16
+- Adds `log()` (and makes `print() = log()`) and `debug()` to the config environment
+
 ## 20220103.1.BETA
 
 - Add `$LOGNAME` to the shell variables and an example of using a notification

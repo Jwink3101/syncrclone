@@ -63,7 +63,8 @@ class Config:
         if self._configpath is None:
             raise ValueError('Must have a config path')
         
-
+        self._config['log'] = self._config['print'] = log
+        self._config['debug'] = debug
         self._config['__file__'] = os.path.abspath(self._configpath)
         self._config['__dir__'] = os.path.dirname(self._config['__file__'])
         self._config['__CPU_COUNT__'] = os.cpu_count()
@@ -78,8 +79,8 @@ class Config:
         # clean up all of the junk
         _tmp = {}
         exec('',_tmp)
-        for key in _tmp:
-            self._config.pop(key,None)
+        for key in _tmp: self._config.pop(key,None)
+        for key in ['log','print','debug']: self._config.pop(key,None)
         
         # Validate
         

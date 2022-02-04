@@ -83,25 +83,22 @@ class Rclone:
         if stream:
             stdout = subprocess.PIPE
             stderr = subprocess.STDOUT
-            bufsize = 1
-            universal_newlines = True
         else: # Stream both stdout and stderr to files to prevent a deadlock
             stdout = tempfile.NamedTemporaryFile(delete=False)
             stderr = tempfile.NamedTemporaryFile(delete=False)
-            bufsize = -1
-            universal_newlines = False
+
         
         t0 = time.time()
         proc = subprocess.Popen(cmd,
                                 stdout=stdout,
                                 stderr=stderr,
-                                universal_newlines=universal_newlines,
-                                env=env,bufsize=bufsize)
+                                env=env)
         
         if stream:
             out = []
             with proc.stdout:
-                for line in iter(proc.stdout.readline, ''):
+                for line in iter(proc.stdout.readline, b''):
+                    line = line.decode(errors="backslashreplace") # Allow for bad decoding. See https://github.com/Jwink3101/syncrclone/issues/16
                     line = line.rstrip()
                     log('rclone:',line)
                     out.append(line)

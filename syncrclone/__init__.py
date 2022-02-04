@@ -1,4 +1,4 @@
-__version__ = '20220103.1.BETA'
+__version__ = '20220204.0.BETA'
 LASTRCLONE = '1.57.0' # This is the last version I tested with. Does *NOT* mean it won't work further.
 
 import time
@@ -20,27 +20,33 @@ class Log:
         self.hist = []
     
     def log(self,*a,**k):
+        """print() to the log with date"""
         debugmode = k.pop('__debug',False)
         
-        t = time.strftime("%Y-%m-%d %H:%M:%S:", time.localtime())
-        a = [t] + list(a)
+        t = time.strftime("%Y-%m-%d %H:%M:%S: ", time.localtime())
+        if debugmode:
+            t = t + 'DEBUG: '
         
-        file0 = k.pop('file',None)
+        k0 = k.copy()
+        # We want to use print() for handing of non-str objects
+        # and representation. So print to io.StringIO, read it, split at \n
+        # and then recombine
         
-        file = io.StringIO()
-        k['file'] = file
+        k['file'] = file = io.StringIO()
+        k['end'] = ''
         print(*a,**k)
-        val = file.getvalue()
-        if not debugmode or DEBUG:
-            self.hist.append((True,val))
-        else:
-            self.hist.append((False,val))
+        
+        lines = file.getvalue().split('\n')
+        lines = [t + line for line in lines]
+        
+        if debugmode and not DEBUG: # Save it in case of error but do not print
+            self.hist.extend((False,line) for line in lines)
             return
         
-        del k['file']
-        if file0:
-            k['file'] = file0
-        print(*a,**k)    
+        for line in lines:
+            self.hist.append((True,line))
+            print(line,**k0)
+        
     __call__ = log
     
     def clear(self):
@@ -54,10 +60,9 @@ class Log:
     
 log = Log()
 
-def debug(*args,**kwargs):
-    kwargs['__debug'] = True
-    args = ('DEBUG:',) + args
-    log(*args,**kwargs)
+def debug(*a,**k):
+    k['__debug'] = True
+    log(*a,**k)
 
 from . import cli
 from . import main
