@@ -6,7 +6,6 @@ import os
 from collections import deque,defaultdict
 import subprocess,shlex
 import lzma
-import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -14,6 +13,7 @@ from . import debug,log
 from .cli import ConfigError
 from .dicttable import DictTable
 from . import utils
+from . import tempfile
 
 FILTER_FLAGS = {'--include', '--exclude', '--include-from', '--exclude-from', 
                 '--filter', '--filter-from','--files-from'}

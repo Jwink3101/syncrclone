@@ -292,7 +292,7 @@ def cli(argv=None):
         if _RETURN:
             return r
     except Exception as E:
-        import tempfile
+        from . import tempfile
         
         tmpdir = tempfile.TemporaryDirectory().name
         os.makedirs(tmpdir)

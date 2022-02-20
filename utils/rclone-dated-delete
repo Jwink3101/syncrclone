@@ -11,7 +11,6 @@ Additional arguments are passed to rclone
 """
 import time
 from datetime import datetime
-import tempfile
 import subprocess
 import shlex
 import operator
@@ -21,6 +20,8 @@ import re
 import sys,os
 from concurrent.futures import ThreadPoolExecutor
 import argparse
+
+from . import tempfile
 
 __version__ = '20211101.0'
 
