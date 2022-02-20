@@ -294,8 +294,10 @@ def cli(argv=None):
     except Exception as E:
         import tempfile
         
+        tempfile.tempdir = os.path.join(tempfile.gettempdir(), config.tmp_dir_suffix)
+        if not os.path.exists(tempfile.gettempdir()):
+            os.makedirs(tempfile.gettempdir())
         tmpdir = tempfile.TemporaryDirectory().name
-        os.makedirs(tmpdir)
         print(f"ERROR. Dumping logs (with debug) to '{tmpdir}/log.txt'",file=sys.stderr)
         with open(f'{tmpdir}/log.txt','wt') as fout:
             fout.write(''.join(line for _,line in log.hist))

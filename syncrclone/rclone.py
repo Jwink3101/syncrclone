@@ -33,14 +33,13 @@ class Rclone:
     def __init__(self,config):
         self.config = config
         self.add_args = [] # logging, etc
+        
+        tempfile.tempdir = os.path.join(tempfile.gettempdir(), self.config.tmp_dir_suffix)
+        if not os.path.exists(tempfile.gettempdir()):
+            os.makedirs(tempfile.gettempdir())
         self.tmpdir = tempfile.TemporaryDirectory().name
         
         self.rclonetime = 0.0
-        
-        try:
-            os.makedirs(self.tmpdir)
-        except OSError:
-            pass
         
         self.validate()
         

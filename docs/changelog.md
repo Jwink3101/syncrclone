@@ -2,6 +2,10 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20220219.0.BETA
+
+* Add the option to set the temporary directory suffix used. This enables using a specified directory in the system temporary directory. Before, all files using the temporary directory had the form (on linux) of `/tmp/tmp[8 characters]`. Now they can have this form: `/tmp/[syncrclone]/tmp[8 characters]`.
+
 ## 20220204.0.BETA
 
 Minor fixes and improvements.

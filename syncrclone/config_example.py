@@ -220,6 +220,10 @@ renamesB = None
 save_logs = True
 local_log_dest = '' # NOT on a remote
 
+# This is the suffix appended to the operating system temporary
+# folder.  This would mean /tmp/[suffix_directory]/ on most unices
+tmp_dir_suffix = 'synrclone'
+
 ## Pre- and Post-run
 # Specify shell code to be evaluated before and/or after running syncrclone. Note
 # these are all run from the directory of this config (as with everything else).
