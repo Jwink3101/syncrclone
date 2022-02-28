@@ -239,7 +239,15 @@ post_sync_shell = ""
 # pre_sync_shell script as the only thing to break afterwards is relisting
 stop_on_shell_error = False
 
-
+# syncrclone needs to write a few temp files for syncing and file listing. By default, 
+# (when set as None), it uses tempfile.TemporaryDirectory().name which is then plotform
+# specific. Alternatively, specify a directory to use for temp files. Remember that paths
+# are relative to this file so use an absolute path as needed
+#
+# NOTE: It is *highly* suggested that you use something unique for each config and/or
+#       run so as to not clobber each other. See (commented) suggestion
+tempdir = None # tempfile.TemporaryDirectory().name
+# import time; tempdir = f"/tmp/{name}/{time.time}
 
 #######
 # This should only be changed by the user when migrating from an older config 

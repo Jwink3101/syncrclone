@@ -116,6 +116,14 @@ class Config:
         
         self._config['action_threads'] = int(max([self._config['action_threads'],1]))
         
+        if self._config['tempdir'] is None:
+            import tempfile
+            self._config['tempdir'] = tmpdir = tempfile.TemporaryDirectory().name
+        try:
+            os.makedirs(self._config['tempdir'])
+        except OSError:
+            pass
+        
         # To be deprecated
         if self._config['conflict_mode'].endswith('_tag'):
             newmode = self._config['conflict_mode'][:-4]
@@ -292,10 +300,7 @@ def cli(argv=None):
         if _RETURN:
             return r
     except Exception as E:
-        import tempfile
-        
-        tmpdir = tempfile.TemporaryDirectory().name
-        os.makedirs(tmpdir)
+        tmpdir = config.tempdir
         print(f"ERROR. Dumping logs (with debug) to '{tmpdir}/log.txt'",file=sys.stderr)
         with open(f'{tmpdir}/log.txt','wt') as fout:
             fout.write(''.join(line for _,line in log.hist))

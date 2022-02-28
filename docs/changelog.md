@@ -2,6 +2,10 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20220228.0.BETA
+
+- Adds the optional `tempdir` config option to specify where temp files should go. Most users will not need this but may be useful to try to avoid writes on some drives. Note, this is **independent** of rclone's temp directoru settings (see `--temp-dir` in [the docs]) *and* there is very little that needs to be written! Closes #18 and closes #20
+
 ## 20220204.0.BETA
 
 Minor fixes and improvements.

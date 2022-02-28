@@ -81,6 +81,7 @@ def test_main(remoteA,renamesA,workdirA,
               compare,
               interactive=False,
               debug=False,
+              config=None,
               ):
     """
     Main test with default settings (if the defaults change, this will need to
@@ -90,6 +91,7 @@ def test_main(remoteA,renamesA,workdirA,
     
     """
     set_debug(debug)
+    if not config: config = {}
     print(remoteA,remoteB)
     test = testutils.Tester('main',remoteA,remoteB)
     
@@ -111,6 +113,10 @@ def test_main(remoteA,renamesA,workdirA,
     
     test.config.workdirA = workdirA
     test.config.workdirB = workdirB
+    
+    # Do this at the end
+    for key,value in config.items():
+        setattr(test.config,key,value)
     
     test.write_config()
     
@@ -661,6 +667,8 @@ def test_three_way():
     I have to switch the configs manually as opposed to having multiple
     configurations. It isn't ideal but works for testing
     """
+    # need to use different tempdirs as they can clobber one another. Just (re)set
+    # `test.config.tempdir = None` each time.
     set_debug(False)
 
     test = testutils.Tester('three','A','B')
@@ -668,6 +676,7 @@ def test_three_way():
     # Just use simple comparisons
     test.config.renamesA = test.config.renamesB = 'hash'
     test.config.name = 'AB'
+    test.config.tempdir = None
     test.write_config()
     
     test.write_pre('A/file1.txt','file1')
@@ -684,6 +693,7 @@ def test_three_way():
     # Modify it to sync A <--> C
     test.config.remoteB = 'C'
     test.config.name = 'AC'
+    test.config.tempdir = None
     test.write_config()
     
     test.write_pre('C/fileC.txt','this is on C')
@@ -701,6 +711,7 @@ def test_three_way():
     
     test.config.remoteB = 'B'
     test.config.name = 'AB'
+    test.config.tempdir = None
     test.write_config()
     
     test.sync()
@@ -711,6 +722,7 @@ def test_three_way():
     test.config.remoteB = 'C'
     test.config.remoteA = 'B'
     test.config.name = 'BC'
+    test.config.tempdir = None
     test.write_config()
     
     test.sync() # Shouldn't do anything
@@ -1335,8 +1347,21 @@ def test_workdir_overlap():
                   'size',debug=True) 
     assert cc.value.returncode == 7,"wrong err type" # https://rclone.org/docs/#exit-code
 
+def test_tempdir():
+    test_main('A','mtime',None,
+              'B','hash',None,
+              'size',
+               config=dict(tempdir='temp'))
+    assert os.path.exists("testdirs/main/temp/")
+    assert set(os.listdir("testdirs/main/temp")) == {
+            "A_curr","A_movedel_back","A_movedel_del_b","A_prev",
+            "B_curr","B_movedel_back","B_movedel_del_b","B_prev",
+            "B_update_hash",
+            "log",
+            "stdout","sterr",
+        }   
 
-
+    os.chdir(PWD0)
 if __name__ == '__main__':
 #     test_main('A','mtime',None,
 #           'B','hash',None,
@@ -1395,6 +1420,7 @@ if __name__ == '__main__':
 #     test_cli_override()
 #     test_reset_state()
 #     test_workdir_overlap()
+#     test_tempdir()
     
     # hacked together parser. This is used to manually test whether the interactive
     # mode is working

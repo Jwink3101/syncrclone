@@ -3,7 +3,6 @@ import json
 import time
 import sys,os,shutil
 import warnings
-import tempfile
 
 from . import debug,log
 from . import utils

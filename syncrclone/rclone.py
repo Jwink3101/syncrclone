@@ -6,7 +6,6 @@ import os
 from collections import deque,defaultdict
 import subprocess,shlex
 import lzma
-import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -33,7 +32,7 @@ class Rclone:
     def __init__(self,config):
         self.config = config
         self.add_args = [] # logging, etc
-        self.tmpdir = tempfile.TemporaryDirectory().name
+        self.tmpdir = config.tempdir
         
         self.rclonetime = 0.0
         
@@ -65,6 +64,7 @@ class Rclone:
         Call rclone. If streaming, will write stdout & stderr to
         log. If logstderr, will always send stderr to log (default)
         """
+        config = self.config
         cmd = shlex.split(self.config.rclone_exe) + cmd
         debug('rclone:call',cmd)
         
@@ -84,8 +84,8 @@ class Rclone:
             stdout = subprocess.PIPE
             stderr = subprocess.STDOUT
         else: # Stream both stdout and stderr to files to prevent a deadlock
-            stdout = tempfile.NamedTemporaryFile(delete=False)
-            stderr = tempfile.NamedTemporaryFile(delete=False)
+            stdout = open(f'{config.tempdir}/stdout',mode='wb')
+            stderr = open(f'{config.tempdir}/sterr',mode='wb')
 
         
         t0 = time.time()
@@ -379,7 +379,7 @@ class Rclone:
             cmd = cmd0.copy()
             cmd[0] = 'move'
             
-            tmpfile = self.tmpdir + f'/{AB}_movedel_{utils.random_str()}' 
+            tmpfile = self.tmpdir + f'/{AB}_movedel_del_b' 
             with open(tmpfile,'wt') as file:
                 file.write('\n'.join(files))
             
@@ -398,7 +398,7 @@ class Rclone:
             cmd += ['--no-traverse','--no-check-dest','--ignore-times']
             cmd += ['--retries','4'] # Extra safe
             
-            tmpfile = self.tmpdir + f'/{AB}_movedel_{utils.random_str()}' 
+            tmpfile = self.tmpdir + f'/{AB}_movedel_del_nb' 
             with open(tmpfile,'wt') as file:
                 file.write('\n'.join(dels_back))
             
@@ -467,7 +467,7 @@ class Rclone:
             cmd += ['--no-traverse','--no-check-dest','--ignore-times']
             cmd += ['--retries','4'] # Extra safe
             
-            tmpfile = self.tmpdir + f'/{AB}_movedel_{utils.random_str()}' 
+            tmpfile = self.tmpdir + f'/{AB}_movedel_back' 
             with open(tmpfile,'wt') as file:
                 file.write('\n'.join(backups))
             
