@@ -174,6 +174,9 @@ class Rclone:
                 log(f'No previous list on {AB}. Reset state')
                 return [] 
         
+        if not os.path.isfile(dst):
+            return []
+
         with lzma.open(dst) as file:
             return json.load(file)
 
