@@ -2,6 +2,10 @@
 
 Robust, Configurable, Bi-Directional sync between *any* two rclone remotes with automatic conflict resolution and backups.
 
+Note that syncrclone has been [sherlocked][sh]. As of v1.58.0, rclone now has [bisync](https://rclone.org/bisync/). syncrclone works fundamentally differently as compared in [syncrclone vs bisync (and rclonesync-v2)](docs/rclone_bisync_compare.md). For the time being, I fully plan to continue development. To be 100% clear, **I have no hard feelings** about it.
+
+[sh]:https://en.wikipedia.org/wiki/Sherlock_(software)#Sherlocked_as_a_term
+
 syncrclone is in beta. It has been tested with a variety of backends but by no means all of them. And only has been real-world tested with a few. See [testing notes](docs/tests.md) for some details.
 
 ## Features

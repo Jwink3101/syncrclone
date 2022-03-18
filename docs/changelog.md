@@ -2,6 +2,12 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20220318.0.BETA
+
+- Updates #23 (and fixes #22) 
+- Added [docs on comparison to rclone's bisync](docs/rclone_bisync_compare.md)
+- Applied the Black formatter to all python files
+
 ## 20220228.0.BETA
 
 - Adds the optional `tempdir` config option to specify where temp files should go. Most users will not need this but may be useful to try to avoid writes on some drives. Note, this is **independent** of rclone's temp directoru settings (see `--temp-dir` in [the docs]) *and* there is very little that needs to be written! Closes #18 and closes #20
