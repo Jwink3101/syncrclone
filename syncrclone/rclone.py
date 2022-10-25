@@ -540,14 +540,14 @@ class Rclone:
                 if line:
                     log("rclone:", line)
 
-    def transfer(self, mode, files):
+    def transfer(self, mode, matched_size,diff_size): 
         config = self.config
         if mode == "A2B":
             src, dst = config.remoteA, config.remoteB
         elif mode == "B2A":
             src, dst = config.remoteB, config.remoteA
 
-        if not files:
+        if not matched_size and not diff_size:
             return
 
         cmd = ["copy"]
@@ -559,30 +559,61 @@ class Rclone:
         # TODO: Consider using *both* as opposed to just one
         # TODO: Make it more clear in the config
 
-        # Unlike move/delete/backup, the destination files may exist
-        # so do *not* use --no-check-dest. May revisit this or make it an
-        # option.
-        # cmd.append('--no-check-dest')
-
-        # We used to also use --ignore-times to *always* transfer but this can cause retries to
-        # of EVERYTHING when only some things fail. The files includes should always be modified by
-        # design so this is harmless
-        # cmd.append('--ignore-times')
+        # We need to be careful about flags for the transfer. Ideally, we would include
+        # either --ignore-times or --no-check-dest to *always* transfer. The problem
+        # is that if any of them need to retry, it will unconditionally transfer 
+        # *everything* again!
+        #
+        # The solution then is to let rclone decide for itself what to transfer from the
+        # the file list. The problem here is we need to match `--size-only` for size 
+        # compare or `--checksum` for hash compare. If the compare is hash, we *already*
+        # did it. And even for mtime, we don't want to request the ModTime on remotes
+        # like S3. The solution is therefore as follows:
+        #   - Decide what changes resulted in size changes (probably most). Run them with
+        #     --size-only. Note that if `compare = 'size'`, this is implicit anyway
+        #   - For those that should transfer but size has changed, run with nothing or 
+        #     --checksum. Do not need to consider --size-only since it will have been
+        #     captured.
+        #
+        # This is still imperfect because of the additional rclone calls but it is safer!
 
         # This flags is not *really* needed but based on the docs (https://rclone.org/docs/#no-traverse),
         # it is likely the case that only a few files will be transfers. This number is a WAG. May change
-        # the future
-        if len(files) <= 100:
-            cmd.append("--no-traverse")
-
-        tmpfile = self.tmpdir + f"{mode}_transfer"
-        with open(tmpfile, "wt") as file:
-            file.write("\n".join(files))
-        cmd += ["--files-from", tmpfile]
-
-        cmd += [src, dst]
-
-        self.call(cmd, stream=True)
+        # the future or be settable.
+        
+        # diff_size first
+        if diff_size:
+            cmddiff = cmd + ['--size-only'] # We KNOW they are different sized
+                    
+            if len(diff_size) <= 100:
+                cmddiff.append("--no-traverse")
+            
+            tmpfile = self.tmpdir + f"{mode}_transfer-diff_size"
+            with open(tmpfile, "wt") as file:
+                file.write("\n".join(diff_size))
+            cmddiff += ["--files-from", tmpfile,src, dst]
+            
+            self.call(cmddiff, stream=True)
+        
+        if matched_size:
+            cmdmatch = cmd.copy()
+            
+            if config.compare == 'hash':
+                cmdmatch.append('--checksum')
+            elif config.compare == 'size':
+                raise ValueError('This should NOT HAPPEN')
+            # else: pass # This just uses ModTime default of rclone
+            
+            if len(matched_size) <= 100:
+                cmdmatch.append("--no-traverse")
+            
+            tmpfile = self.tmpdir + f"{mode}_transfer-matched_size"
+            with open(tmpfile, "wt") as file:
+                file.write("\n".join(matched_size))
+                
+            cmdmatch += ["--files-from", tmpfile,src, dst]
+            self.call(cmdmatch, stream=True)
+            
 
     def copylog(self, remote, srcfile, logname):
         config = self.config

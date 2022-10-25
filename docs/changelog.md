@@ -2,6 +2,13 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20221024.0.BETA
+
+- The final transfer happens in doubles: First does with `--size-only` regardless of settings and the second uses `ModTime` or hashes with `--checksum`
+    - Closes #25
+    - Test is added for this case
+- Some other minor changes to reporting conflicts
+
 ## 20220318.0.BETA
 
 - Updates #23 (and fixes #22) 

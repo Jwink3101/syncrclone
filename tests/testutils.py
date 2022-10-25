@@ -194,9 +194,9 @@ class Tester:
         if dt:
             change_time(path, dt)
 
-    def write_pre(self, path, content, mode="wt"):
+    def write_pre(self, path, content, mode="wt",dt=None):
         """Write items randomly in the past"""
-        dt = -5 * (1 + random.random())
+        dt = dt if not None else -5 * (1 + random.random())
         if path.startswith("B"):
             raise ValueError("No pre on B")
         self.write(path, content, mode=mode, dt=dt)

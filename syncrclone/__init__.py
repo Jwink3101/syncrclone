@@ -1,5 +1,5 @@
-__version__ = "20220318.0.BETA"
-LASTRCLONE = "1.58.0"  # This is the last version I tested with. Does *NOT* mean it won't work further.
+__version__ = "20221024.0.BETA"
+LASTRCLONE = "1.60.0"  # This is the last version I tested with. Does *NOT* mean it won't work further.
 
 import time
 import io
