@@ -165,6 +165,7 @@ class Config:
 
             if not workdir:
                 continue
+
             workdir = os.path.abspath(workdir) if ":" not in workdir else workdir
             remote = os.path.abspath(remote) if ":" not in remote else remote
 
@@ -363,7 +364,7 @@ def cli(argv=None):
                 setattr(
                     config,
                     f"workdir{AB}",
-                    utils.pathjoin(getattr(config, f"remote{AB}"), "/.syncrclone"),
+                    utils.pathjoin(getattr(config, f"remote{AB}"), ".syncrclone"),
                 )
 
         debug("config:", config)

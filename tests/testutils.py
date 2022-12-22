@@ -10,6 +10,7 @@ import re
 import builtins
 import glob
 import zlib
+from pathlib import Path
 
 PWD0 = os.path.abspath(os.path.dirname(__file__))
 os.chdir(PWD0)
@@ -17,6 +18,11 @@ os.chdir(PWD0)
 p = os.path.abspath("../")
 if p not in sys.path:
     sys.path.insert(0, p)
+
+# Make sure the testdirs are ignored by backup tools
+testdir = Path(__file__).parent / "testdirs"
+testdir.mkdir(exist_ok=True, parents=True)
+(testdir / ".ignore").touch()
 
 
 def call(cmd, env=None):
@@ -194,7 +200,7 @@ class Tester:
         if dt:
             change_time(path, dt)
 
-    def write_pre(self, path, content, mode="wt",dt=None):
+    def write_pre(self, path, content, mode="wt", dt=None):
         """Write items randomly in the past"""
         dt = dt if not None else -5 * (1 + random.random())
         if path.startswith("B"):

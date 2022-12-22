@@ -1469,6 +1469,8 @@ def test_workdir_overlap():
         )
 
     # This will NOT be caught as the aliases hide the true remotes from syncrclone
+
+
 #     with pytest.raises(subprocess.CalledProcessError) as cc:
 #         test_main(
 #             "aliasA1:", "mtime", "aliasA2:", "B", "size", None, "size", debug=True
@@ -1500,6 +1502,7 @@ def test_tempdir():
 
     os.chdir(PWD0)
 
+
 def test_hash_compare_sync():
     """
     tests the issue of a hash-based compare on identically timed and sized files failing.
@@ -1510,52 +1513,54 @@ def test_hash_compare_sync():
     But it means that you can trick it. You could tell rclone to use --checksum but that
     would be slow.
     """
-    test = testutils.Tester("hashcomp", 'A', 'B')
+    test = testutils.Tester("hashcomp", "A", "B")
 
-    test.config.renamesA = 'hash'
-    test.config.compare = 'hash'
-    test.config.conflict_mode = 'A'
-    
+    test.config.renamesA = "hash"
+    test.config.compare = "hash"
+    test.config.conflict_mode = "A"
+
     test.write_config()
-    
+
     # Pre
     test.write_pre("A/main.txt", "1234")
     test.write_pre("A/size.txt", "ABCD")
     test.write_pre("A/mtime.txt", "XYZ")
     test.write_pre("A/mtime_mod.txt", "XYZW")
-    test.write_pre("A/move.txt",'aaa')
-    
-    
+    test.write_pre("A/move.txt", "aaa")
+
     # Make sure they are all rounded to avoid it passing when it shouldn't
-    for fn in ['main.txt','size.txt','mtime.txt','mtime_mod.txt']:
-        stat = os.stat(f'A/{fn}')
-        os.utime(f'A/{fn}',(int(stat.st_atime),int(stat.st_mtime)))
-    
-     ## Run
+    for fn in ["main.txt", "size.txt", "mtime.txt", "mtime_mod.txt"]:
+        stat = os.stat(f"A/{fn}")
+        os.utime(f"A/{fn}", (int(stat.st_atime), int(stat.st_mtime)))
+
+    ## Run
     test.setup()
-    
+
     test.write_post("B/main.txt", "4321")
     test.write_post("B/size.txt", "ABCDE")
     test.write_post("B/mtime.txt", "XYZ")
     test.write_post("B/mtime_mod.txt", "xyzw")
     test.write_post("B/new.txt", "=/*")
-    
-    for fn in ['main.txt','size.txt']:
-        stat = os.stat(f'A/{fn}')
-        os.utime(f'B/{fn}',(stat.st_atime,stat.st_mtime))
-    
-    test.move('B/move.txt','B/moved.txt')
-    
+
+    for fn in ["main.txt", "size.txt"]:
+        stat = os.stat(f"A/{fn}")
+        os.utime(f"B/{fn}", (stat.st_atime, stat.st_mtime))
+
+    test.move("B/move.txt", "B/moved.txt")
+
     test.sync()
     diffs = test.compare_tree()
-    
-    assert diffs == set()
-    
-if __name__ == "__main__":
-    test_main('A','mtime',None,
-          'B','hash',None,
-          'size') # Vanilla test covered below
 
+    assert diffs == set()
+
+
+if __name__ == "__main__":
+#     test_main(
+#         "A", "mtime", None, "B", "hash", None, "size"
+#     )  # Vanilla test covered below
+    test_main(
+        "aliasA1:", "mtime", None, "B", "hash", None, "size"
+    )
     #     test_main('cryptA:AA','mtime','cryptA:A',
     #               'B','hash',None,
     #               'size') # Vanilla test covered below
