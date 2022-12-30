@@ -137,16 +137,16 @@ class SyncRClone:
         )
         log("")
         log(f"A >>> B {self.sumA}")
-        
-        self.rclone.transfer("A2B", *self.split_transfer_lists_matching_size('A2B') )
 
-        self.split_transfer_lists_matching_size('B2A')
+        self.rclone.transfer("A2B", *self.split_transfer_lists_matching_size("A2B"))
+
+        self.split_transfer_lists_matching_size("B2A")
         self.sumB = utils.file_summary(
             [self.currB.query_one(Path=f) for f in self.transB2A]
         )
         log("")
         log(f"A <<< B {self.sumB}")
-        self.rclone.transfer("B2A", *self.split_transfer_lists_matching_size('B2A') )
+        self.rclone.transfer("B2A", *self.split_transfer_lists_matching_size("B2A"))
 
         # Update lists if needed
         log("")
@@ -669,35 +669,35 @@ class SyncRClone:
 
         return abs(file1["mtime"] - file2["mtime"]) <= config.dt
 
-    def split_transfer_lists_matching_size(self,mode):
+    def split_transfer_lists_matching_size(self, mode):
         """
         Split transfers into whether they match size or not. See documentation
         of rclone.transfer for explanation
         """
-        if mode == 'A2B':
+        if mode == "A2B":
             trans = self.transA2B
             src = self.currA
             dst = self.currB
-        elif mode == 'B2A':
+        elif mode == "B2A":
             trans = self.transB2A
             src = self.currB
             dst = self.currA
         else:
-            raise ValueError('bad mode')
-        
+            raise ValueError("bad mode")
+
         matched_size = []
         diff_size = []
-        
+
         for file in trans:
             fsrc = src.query_one(Path=file)
             fdst = dst.query_one(Path=file)
-            
-            if not fdst or fsrc['Size'] != fdst['Size']:
+
+            if not fdst or fsrc["Size"] != fdst["Size"]:
                 diff_size.append(file)
             else:
                 matched_size.append(file)
-        
-        return matched_size,diff_size
+
+        return matched_size, diff_size
 
     def avoid_relist(self):
         # actions: 'new','del','tag','backup','trans','moves'
