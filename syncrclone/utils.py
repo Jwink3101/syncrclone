@@ -12,6 +12,25 @@ def random_str(N=10):
     )
 
 
+try:
+    from functools import cache as memoize
+except ImportError:
+    # https://wiki.python.org/moin/PythonDecoratorLibrary#Memoize
+    # note that this decorator ignores **kwargs
+    import functools
+
+    def memoize(obj):
+        cache = obj.cache = {}
+
+        @functools.wraps(obj)
+        def memoizer(*args, **kwargs):
+            if args not in cache:
+                cache[args] = obj(*args, **kwargs)
+            return cache[args]
+
+        return memoizer
+
+
 def RFC3339_to_unix(timestr):
     """
     Parses RFC3339 into a unix time

@@ -8,7 +8,6 @@ import subprocess, shlex
 import lzma
 import time
 from concurrent.futures import ThreadPoolExecutor
-import functools
 
 from . import debug, log
 from .cli import ConfigError
@@ -770,7 +769,7 @@ class Rclone:
                     if line:
                         log("rclone:", line)
 
-    @functools.cache
+    @utils.memoize
     def features(self, remote):
         """Get remote features"""
         config = self.config
