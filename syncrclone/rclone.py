@@ -8,6 +8,7 @@ import subprocess, shlex
 import lzma
 import time
 from concurrent.futures import ThreadPoolExecutor
+import functools
 
 from . import debug, log
 from .cli import ConfigError
@@ -476,9 +477,8 @@ class Rclone:
                         line = line.strip()
                         if line:
                             log("rclone:", line)
-        elif (
-            dels_back
-        ):  # Actually, could just use else here but I want to see in cov if its hit
+        elif dels_back:
+            # Actually, could just use else here but I want to see in cov if its hit
             # Add to backup and delete without backup
             debug("Add to backup + delete", AB, dels_back)
             backups.extend(dels_back)
@@ -506,7 +506,15 @@ class Rclone:
         ## Backups
         if backups:
             cmd = cmd0.copy()
-            cmd[0] = "copy"
+            if config.backup_with_copy is None:
+                cmd[0] = "copy" if self.copy_support(AB) else "move"
+                debug(f"Automatic Copy Support: {cmd[0]}")
+            elif onfig.backup_with_copy:
+                cmd[0] = "copy"
+                debug("Always using copy")
+            else:
+                cmd[0] = "move"
+                debug("Always using move")
 
             # we know the dest does not exists so speed it up
             cmd += ["--no-traverse", "--no-check-dest", "--ignore-times"]
@@ -580,6 +588,10 @@ class Rclone:
         # This flags is not *really* needed but based on the docs (https://rclone.org/docs/#no-traverse),
         # it is likely the case that only a few files will be transfers. This number is a WAG. May change
         # the future or be settable.
+
+        # This was an experiment. Keep it but comment out
+        # if self.config.backup:
+        #     cmd += ['--backup-dir',self.backup_path[{'B2A':'A','A2B':'B'}[mode]]]
 
         # diff_size first
         if diff_size:
@@ -758,13 +770,9 @@ class Rclone:
                     if line:
                         log("rclone:", line)
 
-    def move_support(self, remote):
-        """
-        Return whether or not the remote supports 
-        
-        Defaults to True since if it doesn't support them, calling rmdirs
-        will just do nothing
-        """
+    @functools.cache
+    def features(self, remote):
+        """Get remote features"""
         config = self.config
         AB = remote
         remote = getattr(config, f"remote{AB}")
@@ -776,24 +784,35 @@ class Rclone:
                 stream=False,
             )
         )
-        return features.get("Features", {}).get("Move", True)
+        return features.get("Features", {})
+
+    def copy_support(self, remote):
+        """
+        Return whether or not the remote supports  server-side copy
+        
+        Defaults to False for safety
+        """
+        r = self.features(remote).get("Copy", False)
+        debug(f"Copy Support {remote = }: {r}")
+        return r
+
+    def move_support(self, remote):
+        """
+        Return whether or not the remote supports  server-side move
+        
+        Defaults to False for safety
+        """
+        r = self.features(remote).get("Move", False)
+        debug(f"Move Support {remote = }: {r}")
+        return r
 
     def empty_dir_support(self, remote):
         """
-        Return whether or not the remote supports 
+        Return whether or not the remote supports empty-dirs
         
         Defaults to True since if it doesn't support them, calling rmdirs
         will just do nothing
         """
-        config = self.config
-        AB = remote
-        remote = getattr(config, f"remote{AB}")
-        features = json.loads(
-            self.call(
-                ["backend", "features", remote]
-                + config.rclone_flags
-                + getattr(config, f"rclone_flags{AB}"),
-                stream=False,
-            )
-        )
-        return features.get("Features", {}).get("CanHaveEmptyDirectories", True)
+        r = self.features(remote).get("CanHaveEmptyDirectories", True)
+        debug(f"EmptyDir Support {remote = }: {r}")
+        return r

@@ -70,6 +70,13 @@ def get_MAIN_TESTS():
     yield "cryptA:main", "mtime", "cryptA:wd", "cryptB:main", "mtime", "cryptB:wd", "size"
     yield "cryptA:main", "mtime", "cryptB:wdA", "cryptB:main", "mtime", "cryptA:wdB", "size"  # Mix ?
 
+    # SFTPs
+    yield "mysftp:A", "mtime", None, "mysftp:B", "mtime", None, "mtime"
+    yield "A", "mtime", None, "mysftp:B", "mtime", None, "mtime"
+    yield "mysftp:A", "mtime", None, "B", "mtime", None, "mtime"
+    yield "mysftp:A", "mtime", "mysftp:Awb", "mysftp:B", "mtime", "mysftp:Bwb", "mtime"
+    # WebDAVs (comment out since something is up with the server I think)
+
 
 MAIN_TESTS = list(get_MAIN_TESTS())
 # MAIN_TESTS = [["A", "mtime", None, "B", "hash", None, "size"]]
@@ -123,8 +130,8 @@ def test_main(
 
     test.config.workdirA = workdirA
     test.config.workdirB = workdirB
-    
-    if avoid_relist is not None: # Not just True or False
+
+    if avoid_relist is not None:  # Not just True or False
         test.config.avoid_relist = avoid_relist
 
     # Do this at the end
@@ -325,6 +332,7 @@ def test_main(
     assert exists("A/.syncrclone/") is (False if workdirA else True)
     assert exists("B/.syncrclone/") is (False if workdirB else True)
 
+    test.done()
     os.chdir(PWD0)
 
 
@@ -336,7 +344,7 @@ def test_avoid_relist():
     try:  # use try/finally to ensure it is *always* reset
         syncrclone.main._TEST_AVOID_RELIST = True
         # need to set avoid_relist=False to make sure it doesn't just happen
-        test_main("A", "hash", None, "B", "hash", None, "hash",avoid_relist=False)
+        test_main("A", "hash", None, "B", "hash", None, "hash", avoid_relist=False)
     finally:
         syncrclone.main._TEST_AVOID_RELIST = False
 
@@ -1605,9 +1613,41 @@ def test_hash_compare_sync():
 
 
 if __name__ == "__main__":
-#     test_main(
-#         "A", "mtime", None, "B", "hash", None, "size"
-#     )  # Vanilla test covered below
+    test_main(
+        # remoteA,renamesA,workdirA,remoteB,renamesB,workdirB,compare
+        "A",
+        "mtime",
+        None,
+        "B",
+        "hash",
+        None,
+        "size",
+        debug=True,
+    )  # Vanilla test covered below
+
+    #     test_main(
+    #         # remoteA,renamesA,workdirA,remoteB,renamesB,workdirB,compare
+    #         "A", "size", "Awork", "B", "size", "Bwork", "size"
+    #     )  # Vanilla test covered below
+    #
+    # Test with workdirs
+    #     test_main(
+    #         "cryptA:main",
+    #         "mtime",
+    #         "cryptB:wdA",
+    #         "cryptB:main",
+    #         "mtime",
+    #         "cryptA:wdB",
+    #         "size",
+    #     )
+
+    # Test with SFTP
+    # test_main('mysftp:A','mtime',None,'mysftp:B','mtime',None,'size',debug=True)
+    # test_main("mysftp:A", "mtime", None, "B", "mtime", None, "size", debug=True)
+
+    # Test with Webdav -- This doesn't work for some reason related to the sever, not
+    # syncrclone as far as I can tell. Quote it out (not comment so it isn't undone)
+    #     """test_main('mywebdav:A','mtime',None,'mywebdav:B','mtime',None,'size',debug=True)"""
 
     #     test_main('cryptA:AA','mtime','cryptA:A',
     #               'B','hash',None,

@@ -140,6 +140,17 @@ always_get_mtime = True
 # the workdir folder)
 backup = True
 
+# For safety, backups are usually done with a copy but some remotes do not support
+# server-side-copy. Using copy then means that you do a download+upload. To be
+# more efficient, you can use `move` instead of `copy`. If there is an interruption,
+# the file may be in the backup dir and could appear deleted. Nothing *should* be lost
+# but care should be taken.
+#
+# None: Automatic based on remote support
+# False: Always use move (not suggested)
+# True: Always use copy (safest)
+backup_with_copy = None
+
 # Specify whether to also sync the backed up files between A and B. If True,
 # both remotes will have all of the backups. If False, each remote will only
 # have what it backed up on the respective side.

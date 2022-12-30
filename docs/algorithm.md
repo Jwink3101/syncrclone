@@ -83,3 +83,11 @@ If *anything* was changed or transfered to a side, a list is remade. The same ha
 ### Avoiding Relisting
 
 Theatrically, you could avoid re-listing since you can propagate the same changes to the file lists that you do in practice. But this is fragile and introduces many edge cases; especially around hashes and tracking. <del>This may be considered in the future but not at the moment.</del>
+
+## Other Notes
+
+### Backups
+
+Pre 20221230.0 (or thereabouts), backups were done as `copy` before uploading. The problem is, on remotes that do not support server-side copy, this is horribly inefficient as rclone downloads then uploads the file. But if a remote supports, server-side move, this is risky because an interruption could cause problems.
+
+Instead, now, backups are done via `copy --backup-dir` in the transfer. This can still have an interruption problem but is handled within rclone and is less likely since it will move on a file-by-file basis, unlike if syncrclone did it all first.

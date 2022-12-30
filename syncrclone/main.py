@@ -106,7 +106,6 @@ class SyncRClone:
         if not config.backup:  # Delete in place though I don't think it matters
             del self.backupA[:]
             del self.backupB[:]
-
         log("")
         log("Performing Actions on A")
         self.rclone.delete_backup_move("A", self.delA, self.backupA, self.movesA)
@@ -358,6 +357,10 @@ class SyncRClone:
         self.tagA, self.tagB = list(), list()  # Will be tagged (moved) then transfer
 
         # These will not need be modified further.
+        # -------- LEGACY note
+        # self.backup{A/B} are actually not needed but because backups are now handled
+        # by --backup-dir and rclone. But, I keep them around since they may be useful
+        # for diagnostics. Whenever they are added, a "# Legacy -- see note"
         self.backupA, self.backupB = list(), list()
         self.transA2B, self.transB2A = list(), list()
         self.movesA, self.movesB = (

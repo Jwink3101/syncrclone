@@ -2,6 +2,11 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20221230.0.BETA
+
+- Added the `backup_with_copy` config option. Backups used to *always* be done with `copy` which is the safest but on remotes that do not support server-side copy, this is potentially *very* inefficient since it has to download and upload data. Instead, this can now backup with `move`. The only problem is if a run is interrupted, the state can be confusing. It is, of course, still backedup, but may be hard to unwind
+- Added some SFTP tests. Also have machinery for WebDAV tests but there is some issue with the server at the moment (maybe a bug? User error?) so it is not in there.
+
 ## 20221229.0.BETA
 
 - `avoid_relist=True` is **NOW THE DEFAULT**. This should work great for nearly all situations but if not, set it to `False` explicitly. Please be careful

@@ -68,6 +68,14 @@ class Tester:
         self.config.parse()
         self.config.rclone_env["RCLONE_CONFIG"] = "rclone.cfg"
 
+        self.sftp = SFTP(os.path.join(self.pwd, "sftp"))
+        if remoteA.startswith("mysftp:") or remoteB.startswith("mysftp:"):
+            self.sftp.start()
+
+        self.webdav = WEBDAV(os.path.join(self.pwd, "webdav"))
+        if remoteA.startswith("mywebdav:") or remoteB.startswith("mywebdav:"):
+            self.webdav.start()
+
     def write_config(self):
         self.config.local_log_dest = "logs/"
         with open(self.config._configpath, "wt") as file:
@@ -264,6 +272,65 @@ class Tester:
                 result.add(("disagree", fileAB))
 
         return result
+
+    def done(self):
+        os.chdir(PWD0)
+        self.sftp.stop()
+        self.webdav.stop()
+
+
+class SFTP:
+    def __init__(self, path):
+        self.pwd = path
+        self.running = False
+
+    def start(self):
+        cmd = [
+            "rclone",
+            "serve",
+            "sftp",
+            self.pwd,
+            "--no-auth",
+            "--addr",
+            "localhost:20222",
+        ]
+        print(f"SFTP: {cmd = }")
+        self.proc = subprocess.Popen(
+            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        self.running = True
+        print("START SFTP")
+
+    def stop(self):
+        if not self.running:
+            return
+        import signal
+
+        self.proc.send_signal(signal.SIGKILL)
+        print("END SFTP")
+
+
+class WEBDAV:
+    def __init__(self, path):
+        self.pwd = path
+        self.running = False
+
+    def start(self):
+        cmd = ["rclone", "serve", "webdav", self.pwd, "--addr", "localhost:20223"]
+        print(f"WEBDAV: {cmd = }")
+        self.proc = subprocess.Popen(
+            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        self.running = True
+        print("START WEBDAV")
+
+    def stop(self):
+        if not self.running:
+            return
+        import signal
+
+        self.proc.send_signal(signal.SIGKILL)
+        print("END WEBDAV")
 
 
 def adler32(filepath, blocksize=2 ** 20):
