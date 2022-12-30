@@ -186,9 +186,8 @@ cleanup_empty_dirsB = None
 # using the original. Note that this feature is EXPERIMENTAL. There may be some edge
 # cases not considered; especially with regards to move tracking and hashes.
 #
-# However, for most use cases, this will improve performance and may become the default
-# in the future
-avoid_relist = False
+# The default used to be False but it is now True. See the docs for more details.
+avoid_relist = True
 
 ## Rename Tracking
 
@@ -228,7 +227,14 @@ local_log_dest = ""  # NOT on a remote
 # STDOUT and STDERR will be captured. Note that there is no validation or
 # security of the inputs. These are not actually called if using dry-run.
 #
-# If specified as a list, will run directly with subprocess. Otherwise uses shell=True
+# Can be specified as the following:
+#
+#     string : Run with shell=True in the parent directory to this file.
+#              Can cd as needed and can be multiple lines and multiple commands.
+#     list   : Will execute with shell=False in the parent directory to this file.
+#     dict   : Specify subprocess.Popen flags plus the keyword 'cmd'. YOU decide if
+#              shell should be True or False based on 'cmd'. Will overwrite settings
+#              for std(out/err). Will update current environ with any 'env' settings.
 pre_sync_shell = ""
 
 # The _post_ shell call also has "$STATS" defined which prints the run statistics and

@@ -156,6 +156,29 @@ def search_upwards(pwd):
     return search_upwards(newpwd)
 
 
+def time_format(dt, upper=False):
+    """Format time into days (D), hours (H), minutes (M), and seconds (S)"""
+    labels = [  # Label, # of sec
+        ("D", 60 * 60 * 24),
+        ("H", 60 * 60),
+        ("M", 60),
+        ("S", 1),
+    ]
+    res = []
+    for label, sec in labels:
+        val, dt = divmod(dt, sec)
+        if not val and not res and label != "S":  # Do not skip if already done
+            continue
+        if label == "S" and dt > 0:  # Need to handle leftover
+            res.append(f"{val+dt:0.2f}")
+        elif label in "HMS":  # these get zero padded
+            res.append(f"{int(val):02d}")
+        else:  # Do not zero pad dats
+            res.append(f"{int(val):d}")
+        res.append(label if upper else label.lower())
+    return "".join(res)
+
+
 def pathjoin(*args):
     """
     This is like os.path.join but does some rclone-specific things because there could be

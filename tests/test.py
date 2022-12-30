@@ -10,6 +10,7 @@ import time
 import warnings
 import re
 import zlib, lzma, json, subprocess
+import textwrap
 
 import testutils
 
@@ -71,6 +72,7 @@ def get_MAIN_TESTS():
 
 
 MAIN_TESTS = list(get_MAIN_TESTS())
+# MAIN_TESTS = [["A", "mtime", None, "B", "hash", None, "size"]]
 
 
 @pytest.mark.parametrize(
@@ -87,6 +89,7 @@ def test_main(
     interactive=False,
     debug=False,
     config=None,
+    avoid_relist=None,
 ):
     """
     Main test with default settings (if the defaults change, this will need to
@@ -120,6 +123,9 @@ def test_main(
 
     test.config.workdirA = workdirA
     test.config.workdirB = workdirB
+    
+    if avoid_relist is not None: # Not just True or False
+        test.config.avoid_relist = avoid_relist
 
     # Do this at the end
     for key, value in config.items():
@@ -329,7 +335,8 @@ def test_avoid_relist():
     """
     try:  # use try/finally to ensure it is *always* reset
         syncrclone.main._TEST_AVOID_RELIST = True
-        test_main("A", "hash", None, "B", "hash", None, "hash")
+        # need to set avoid_relist=False to make sure it doesn't just happen
+        test_main("A", "hash", None, "B", "hash", None, "hash",avoid_relist=False)
     finally:
         syncrclone.main._TEST_AVOID_RELIST = False
 
@@ -393,15 +400,15 @@ def test_move_attribs(attrib):
     test.write_config()
 
     # Setup
-    test.write_pre("A/file1.txt", "1")
-    test.write_pre("A/file2.txt", "12")
-    test.write_pre("A/file3.txt", "123")
-    test.write_pre("A/fileC.txt", "ABC")
+    test.write_pre("A/file1.txt", "1", dt=-1)
+    test.write_pre("A/file2.txt", "12", dt=-3)
+    test.write_pre("A/file3.txt", "123", dt=-5)
+    test.write_pre("A/fileC.txt", "ABC", dt=-7)
 
-    test.write_pre("A/fileD.txt", "ABCD")
-    test.write_pre("A/file4.txt", "ABCD")
+    test.write_pre("A/fileD.txt", "ABCD", dt=-9)
+    test.write_pre("A/file4.txt", "ABCD", dt=-11)
 
-    test.write_pre("A/file5.txt", "12345")
+    test.write_pre("A/file5.txt", "12345", dt=-13)
 
     test.setup()
 
@@ -1180,12 +1187,13 @@ def test_no_modtime(always, compare, renamesA, renamesB, conflict_mode):
     test.config.renamesA = renamesA
     test.config.renamesB = renamesB
     test.config.conflict_mode = conflict_mode
+    test.config.avoid_relist = False
 
     test.write_config()
 
-    test.write_pre("A/fileA.txt", "A")
-    test.write_pre("A/fileB.txt", "B")
-    test.write_pre("A/fileMod.txt", "AB")
+    test.write_pre("A/fileA.txt", "A", dt=-2)
+    test.write_pre("A/fileB.txt", "B", dt=-4)
+    test.write_pre("A/fileMod.txt", "AB", dt=-6)
 
     test.setup()
 
@@ -1269,6 +1277,48 @@ def test_prepost_script(dry):
         assert "STDOUT: posttest post-test" in log
         assert "A: New 0 | Deleted 0 | Backed Up 0 | Moved 0" in log
         assert "STDERR: eee" in log
+
+    # Test with Popen settings
+    test.write_post("B/fileA.txt", "DA")
+    test.config.post_sync_shell = ""
+
+    os.environ["TEST0"] = "env test"
+    test.config.pre_sync_shell = {
+        "cmd": [
+            sys.executable,
+            "-c",
+            textwrap.dedent(
+                """
+                    import os, json
+                    res = {"TEST0":os.environ.get("TEST0","FAIL"),
+                           "TEST1":os.environ.get("TEST1","FAIL"),
+                           "cwd":os.getcwd(),}
+                    print(f"CAPTURE>>>{json.dumps(res)}<<<CAPTURE")
+                     """
+            ),
+        ],
+        "env": {"TEST1": "pre dict env"},
+        "cwd": os.path.expanduser("~"),
+    }
+    test.write_config()
+    if dry:
+        test.sync(flags=["--dry-run"])
+    else:
+        test.sync()
+
+    log = "".join(test.synclogs[-1])
+
+    # dict cmd
+    matches = re.findall("CAPTURE>>>(.*?)<<<CAPTURE", log)
+    if dry:
+        assert len(matches) == 1  # just listing
+    else:
+        assert len(matches) == 2  # listing and then actual results
+        pre_dict = json.loads(matches[1])
+        assert pre_dict.pop("TEST0") == "env test"
+        assert pre_dict.pop("TEST1") == "pre dict env"
+        assert pre_dict.pop("cwd") == os.path.expanduser("~")
+        assert len(pre_dict) == 0  # Should be nothing left
 
     os.chdir(PWD0)
 
@@ -1558,9 +1608,7 @@ if __name__ == "__main__":
 #     test_main(
 #         "A", "mtime", None, "B", "hash", None, "size"
 #     )  # Vanilla test covered below
-    test_main(
-        "aliasA1:", "mtime", None, "B", "hash", None, "size"
-    )
+
     #     test_main('cryptA:AA','mtime','cryptA:A',
     #               'B','hash',None,
     #               'size') # Vanilla test covered below

@@ -2,6 +2,15 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20221229.0.BETA
+
+- `avoid_relist=True` is **NOW THE DEFAULT**. This should work great for nearly all situations but if not, set it to `False` explicitly. Please be careful
+- Added the ability to specify `subprocess.Popen` flags for the pre/post/fail`_shell` values. ("`shell`" is now really a misnomer but I'll keep it).
+- Bug fixes
+    - Root paths with SFTP. Closes [26](https://github.com/Jwink3101/syncrclone/issues/26)
+        - I am not 100% sure this fixes it because I haven't heard back but (a) this should be changed anyway and (b) the symptoms sound correct for this fix
+    - Tests were failing from (a) the change in `avoid_relist` and (b) a change a while ago in the utils. These were fixed
+
 ## 20221024.0.BETA
 
 - The final transfer happens in doubles: First does with `--size-only` regardless of settings and the second uses `ModTime` or hashes with `--checksum`
@@ -17,7 +26,7 @@ This will likely get wiped when I go out of beta.
 
 ## 20220228.0.BETA
 
-- Adds the optional `tempdir` config option to specify where temp files should go. Most users will not need this but may be useful to try to avoid writes on some drives. Note, this is **independent** of rclone's temp directoru settings (see `--temp-dir` in [the docs]) *and* there is very little that needs to be written! Closes #18 and closes #20
+- Adds the optional `tempdir` config option to specify where temp files should go. Most users will not need this but may be useful to try to avoid writes on some drives. Note, this is **independent** of rclone's temp directory settings (see `--temp-dir` in [the docs]) *and* there is very little that needs to be written! Closes #18 and closes #20
 
 ## 20220204.0.BETA
 

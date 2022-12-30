@@ -19,6 +19,7 @@ class SyncRClone:
         locks
         """
         self.t0 = time.time()
+        self.shell_time = 0.0
         self.now = time.strftime("%Y-%m-%dT%H%M%S", time.localtime())
         self.now_compact = self.now.replace("-", "")
 
@@ -743,32 +744,56 @@ class SyncRClone:
 
     def run_shell(self, pre=None):
         """Run the shell commands"""
+        t0 = time.time()
+        dry = self.config.dry_run
         import subprocess
 
         cmds = self.config.pre_sync_shell if pre else self.config.post_sync_shell
         if not cmds:
             return
-        log("")
-        log("Running shell commands")
-        prefix = "DRY RUN " if self.config.dry_run else ""
+
+        environ = os.environ.copy()
+        environ["LOGNAME"] = self.logname
+
+        kwargs = {}
+
+        prefix = "DRY RUN " if dry else ""
         if isinstance(cmds, str):
-            for line in cmds.split("\n"):
+            for line in cmds.rstrip().split("\n"):
                 log(f"{prefix}$ {line}")
             shell = True
-        else:
+        elif isinstance(cmds, (list, tuple)):
             log(f"{prefix}{cmds}")
             shell = False
+        elif isinstance(cmds, dict):
+            log(f"{prefix}{cmds}")
+            cmds0 = cmds.copy()
+            try:
+                cmds = cmds0.pop("cmd")
+            except KeyError:
+                raise KeyError("Dict shell commands MUST have 'cmd' defined")
+            shell = cmds0.pop("shell", False)
+            environ.update(cmds0.pop("env", {}))
+            cmds0.pop("stdout", None)
+            cmds0.pop("stderr", None)
+            debug(f"Cleaned cmd: {cmds0}")
+            kwargs.update(cmds0)
+        else:
+            raise TypeError("Shell commands must be str, list/tuple, or dict")
 
-        if self.config.dry_run:
-            return log("DRY-RUN: NOT RUNNING")
+        if dry:
+            return log("DRY-RUN: Not running")
 
-        env = os.environ.copy()
         if not pre:
-            env["STATS"] = self.stats()
-        env["LOGNAME"] = self.logname
+            environ["STATS"] = self.stats()
 
         proc = subprocess.Popen(
-            cmds, shell=shell, env=env, stderr=subprocess.PIPE, stdout=subprocess.PIPE
+            cmds,
+            shell=shell,
+            env=environ,
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            **kwargs,
         )
 
         out, err = proc.communicate()
@@ -781,8 +806,12 @@ class SyncRClone:
                 log(f"STDERR: {line}")
         if proc.returncode > 0:
             log(f"WARNING: Command return non-zero returncode: {proc.returncode}")
+        if proc.returncode > 0:
+            log(f"WARNING: Command return non-zero returncode: {proc.returncode}")
             if self.config.stop_on_shell_error:
                 raise subprocess.CalledProcessError(proc.returncode, cmds)
+
+        self.shell_time += time.time() - t0
 
     def stats(self):
         txt = [f"A >>> B {self.sumA} | A <<< B {self.sumB}"]
@@ -805,7 +834,8 @@ class SyncRClone:
                 f'{name} {len(getattr(self,attr + "B"))}' for name, attr in attrnames
             )
         )
-        txt.append(
-            f"Time: {time.time() - self.t0:0.2f}s (rclone {self.rclone.rclonetime:0.2f}s)"
-        )
+        dt = utils.time_format(time.time() - self.t0)
+        dt_rclone = utils.time_format(self.rclone.rclonetime)
+        dt_shell = utils.time_format(self.shell_time)
+        txt.append(f"Time: {dt} (rclone {dt_rclone}, shell {dt_shell})")
         return "\n".join(txt)

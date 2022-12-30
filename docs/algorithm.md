@@ -82,4 +82,4 @@ If *anything* was changed or transfered to a side, a list is remade. The same ha
 
 ### Avoiding Relisting
 
-Theatrically, you could avoid re-listing since you can propagate the same changes to the file lists that you do in practice. But this is fragile and introduces many edge cases; especially around hashes and tracking. This may be considered in the future but not at the moment.
+Theatrically, you could avoid re-listing since you can propagate the same changes to the file lists that you do in practice. But this is fragile and introduces many edge cases; especially around hashes and tracking. <del>This may be considered in the future but not at the moment.</del>
