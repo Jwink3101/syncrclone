@@ -100,8 +100,9 @@ class Rclone:
             stdout = subprocess.PIPE
             stderr = subprocess.STDOUT
         else:  # Stream both stdout and stderr to files to prevent a deadlock
-            stdout = open(f"{config.tempdir}/stdout", mode="wb")
-            stderr = open(f"{config.tempdir}/sterr", mode="wb")
+            tns = time.time_ns()
+            stdout = open(f"{config.tempdir}/std.{tns}.out", mode="wb")
+            stderr = open(f"{config.tempdir}/std.{tns}.err", mode="wb")
 
         t0 = time.time()
         proc = subprocess.Popen(cmd, stdout=stdout, stderr=stderr, env=env)

@@ -1,4 +1,4 @@
-__version__ = "20221230.1.BETA"
+__version__ = "20230103.0.BETA"
 LASTRCLONE = "1.61.1"  # This is the last version I tested with. Does *NOT* mean it won't work further.
 
 import time
@@ -58,7 +58,7 @@ class Log:
     def dump(self, path, mode="wt"):
         log("---- END OF LOG ----")
         with open(path, mode) as file:
-            file.write("".join(line for t, line in self.hist if t))
+            file.write("\n".join(line for t, line in self.hist if t))
 
 
 log = Log()

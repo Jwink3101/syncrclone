@@ -2,6 +2,13 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20230103.0.BETA
+
+- File listings happen in concurrently in their own threads to
+- Fixed log output not having new lines
+- Fixed warning about `avoid_relist` and added note to actually turn it on for most cases
+- The tempdir is deleted if the run is successful
+
 ## 20221230.1.BETA
 
 - Added backup cache for older Python

@@ -42,12 +42,22 @@ class SyncRClone:
 
         # Get file lists
         log("")
-        log(f"Refreshing file list on A '{config.remoteA}'")
-        self.currA, self.prevA = self.rclone.file_list(remote="A")
+        log("Refreshing file lists concurrently")
+
+        listA = utils.ReturnThread(
+            target=self.rclone.file_list, kwargs=dict(remote="A")
+        ).start()
+        time.sleep(2e-6)  # 2 microseconds just to make sure the time_ns() changes
+        listB = utils.ReturnThread(
+            target=self.rclone.file_list, kwargs=dict(remote="B")
+        ).start()
+
+        self.currA, self.prevA = listA.join()
+        log(f"Refreshed file list on A '{config.remoteA}'")
         log(utils.file_summary(self.currA))
 
-        log(f"Refreshing file list on B '{config.remoteB}'")
-        self.currB, self.prevB = self.rclone.file_list(remote="B")
+        self.currB, self.prevB = listB.join()
+        log(f"Refreshed file list on B '{config.remoteB}'")
         log(utils.file_summary(self.currB))
 
         if config.set_lock:
@@ -154,21 +164,40 @@ class SyncRClone:
             log("Apply changes to file lists instead of refreshing")
             new_listA, new_listB = self.avoid_relist()
         else:
-            if self.delA or self.backupA or self.movesA or self.transB2A:
-                log("Refreshing file list on A")
-                new_listA, _ = self.rclone.file_list(remote="A", prev_list=self.currA0)
-                log(utils.file_summary(new_listA))
+            refreshA = self.delA or self.backupA or self.movesA or self.transB2A
+            if refreshA:
+                log("Refreshing file list on A (concurrently if needed)")
+                threadA = utils.ReturnThread(
+                    target=self.rclone.file_list,
+                    kwargs=dict(remote="A", prev_list=self.currA0),
+                ).start()
             else:
                 log("No need to refresh file list on A")
                 new_listA = self.currA0
 
-            if self.delB or self.backupB or self.movesB or self.transA2B:
-                log("Refreshing file list on B")
-                new_listB, _ = self.rclone.file_list(remote="B", prev_list=self.currB0)
-                log(utils.file_summary(new_listB))
+            refreshB = self.delB or self.backupB or self.movesB or self.transA2B
+            if refreshB:
+                log("Refreshing file list on B (concurrently if needed)")
+                if refreshA:
+                    # 2 microseconds just to make sure the time_ns() changes
+                    time.sleep(2e-6)
+                threadB = utils.ReturnThread(
+                    target=self.rclone.file_list,
+                    kwargs=dict(remote="B", prev_list=self.currB0),
+                ).start()
             else:
                 log("No need to refresh file list on B")
                 new_listB = self.currB0
+
+            # Wait for threads if needed
+            if refreshA:
+                new_listA, _ = threadA.join()
+                log("Refresh file list on A")
+                log(utils.file_summary(new_listA))
+            if refreshB:
+                new_listB, _ = threadB.join()
+                log("Refresh file list on B")
+                log(utils.file_summary(new_listB))
 
         if config.cleanup_empty_dirsA or (
             config.cleanup_empty_dirsA is None and self.rclone.empty_dir_support("A")
@@ -206,9 +235,8 @@ class SyncRClone:
         self.rclone.push_file_list(new_listA, remote="A")
         self.rclone.push_file_list(new_listB, remote="B")
 
-        if (
-            self.config.set_lock
-        ):  # There shouldn't be a lock since we didn't set it so save the rclone call
+        # There shouldn't be a lock since we didn't set it so save the rclone call
+        if self.config.set_lock:
             self.rclone.lock(breaklock=True)
 
         self.stats()

@@ -2,6 +2,7 @@ import datetime
 import random
 import string
 import os
+from threading import Thread
 
 from . import log, debug
 
@@ -224,3 +225,30 @@ def pathjoin(*args):
 
     path = os.path.join(path, *rest)
     return path
+
+
+class ReturnThread(Thread):
+    """
+    Like a regular thread except when you `join`, it returns the function
+    result. And .start() will return itself to enable cleaner code.
+    
+        >>> mythread = ReturnThread(...).start() # instantiate and start
+    
+    Note that target is a required keyword argument.
+    """
+
+    def __init__(self, *, target, **kwargs):
+        self.target = target
+        super().__init__(target=self._target, **kwargs)
+        self._res = None
+
+    def start(self, *args, **kwargs):
+        super().start(*args, **kwargs)
+        return self
+
+    def _target(self, *args, **kwargs):
+        self._res = self.target(*args, **kwargs)
+
+    def join(self, *args, **kwargs):
+        super().join(*args, **kwargs)
+        return self._res

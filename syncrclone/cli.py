@@ -4,6 +4,7 @@ import sys
 import os
 import random
 import warnings
+import shutil
 
 _showwarning = warnings.showwarning  # store this
 
@@ -153,8 +154,13 @@ class Config:
         if skiplog:
             return
 
-        if self._config["avoid_relist"]:
-            log("WARNING: avoid_relist is experimental. Use with caution.")
+        if not self._config["avoid_relist"]:
+            log(
+                (
+                    "NOTE: 'avoid_relist' is set to False. For *most* use-cases, "
+                    "it should be set to True to improve performance!"
+                )
+            )
         if self._config.get("log_dest", False):
             log("WARNING: log_dest is deprecated and ignored. See `save_logs`")
 
@@ -371,13 +377,20 @@ def cli(argv=None):
         r = SyncRClone(config, break_lock=config.break_lock)
         if _RETURN:
             return r
+        # Do this iff not returning
+        try:
+            shutil.rmtree(r.config.tempdir)
+        except OSError:
+            log(
+                f"WARNING (unlogged): Could not remote tempdir {repr(r.config.tempdir)}"
+            )
     except Exception as E:
         tmpdir = config.tempdir
         print(
             f"ERROR. Dumping logs (with debug) to '{tmpdir}/log.txt'", file=sys.stderr
         )
         with open(f"{tmpdir}/log.txt", "wt") as fout:
-            fout.write("".join(line for _, line in log.hist))
+            fout.write("\n".join(line for _, line in log.hist))
 
         if get_debug():
             raise

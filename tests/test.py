@@ -341,6 +341,10 @@ def test_avoid_relist():
     Test avoiding the relist by calling test_main() with the different options and
     comparing the lists at the end. The mtimes will be off but they should agree otherwise
     """
+    test_main("A", "hash", None, "B", "hash", None, "hash", avoid_relist=False)
+    test_main("A", "hash", None, "B", "hash", None, "hash", avoid_relist=True)
+
+    # Test some internals
     try:  # use try/finally to ensure it is *always* reset
         syncrclone.main._TEST_AVOID_RELIST = True
         # need to set avoid_relist=False to make sure it doesn't just happen
@@ -1543,7 +1547,10 @@ def test_tempdir():
         "A", "mtime", None, "B", "hash", None, "size", config=dict(tempdir="temp")
     )
     assert os.path.exists("testdirs/main/temp/")
-    assert set(os.listdir("testdirs/main/temp")) == {
+
+    # Make sure that the temp files are (a) here and (b) these are them
+    tmpfiles = set(os.listdir("testdirs/main/temp"))
+    expected = {
         "A_curr",
         "A_movedel_back",
         "A_movedel_del_b",
@@ -1554,9 +1561,12 @@ def test_tempdir():
         "B_prev",
         "B_update_hash",
         "log",
-        "stdout",
-        "sterr",
     }
+    assert expected - tmpfiles == set()
+
+    # Still expect stdout and stderr
+    remain = tmpfiles - expected
+    assert all(re.match(r"^std\.[0-9]{19}\.(out|err)$", name) for name in remain)
 
     os.chdir(PWD0)
 
@@ -1613,17 +1623,18 @@ def test_hash_compare_sync():
 
 
 if __name__ == "__main__":
-    test_main(
-        # remoteA,renamesA,workdirA,remoteB,renamesB,workdirB,compare
-        "A",
-        "mtime",
-        None,
-        "B",
-        "hash",
-        None,
-        "size",
-        debug=True,
-    )  # Vanilla test covered below
+    #     test_main(
+    #         # remoteA,renamesA,workdirA,remoteB,renamesB,workdirB,compare
+    #         "A",
+    #         "mtime",
+    #         None,
+    #         "B",
+    #         "hash",
+    #         None,
+    #         "size",
+    #         debug=False,
+    #         avoid_relist=False,
+    #     )  # Vanilla test covered below
 
     #     test_main(
     #         # remoteA,renamesA,workdirA,remoteB,renamesB,workdirB,compare
@@ -1701,7 +1712,7 @@ if __name__ == "__main__":
     #     test_cli_override()
     #     test_reset_state()
     #     test_workdir_overlap()
-    #     test_tempdir()
+    test_tempdir()
     #     test_hash_compare_sync()
 
     # hacked together parser. This is used to manually test whether the interactive
