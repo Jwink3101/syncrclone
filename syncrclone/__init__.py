@@ -1,5 +1,6 @@
-__version__ = "20230103.0.BETA"
+__version__ = "20230105.0.BETA"
 LASTRCLONE = "1.61.1"  # This is the last version I tested with. Does *NOT* mean it won't work further.
+MINRCLONE = "1.59.0"  # Will not work prior to this
 
 import time
 import io

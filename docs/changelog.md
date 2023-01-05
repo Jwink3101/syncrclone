@@ -2,6 +2,12 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20230105.0.BETA
+
+- Undoes some (extensive) optimization to avoid overlapping remotes. Prior to rclone 1.59.0 (documented in 1.60.0), you could not have moves that overlap even if the destination was filtered. This was changed in [PR #6312](https://github.com/rclone/rclone/pull/6312) so we can undo this optimization. **NOTE**: This will break compatibility with rclone versions less than 1.59.0!
+- Added a version check and error
+- Added an optimization to the move tracking execution. While not as optimized as full directory moving (which I contend has too many edge cases), it batches moves within common directory paths when possible. This still requires rclone to make file moves (as opposed to directory moves) but it avoids duplicate checks and enables rclone's (superior) threading.
+
 ## 20230103.0.BETA
 
 - File listings happen in concurrently in their own threads to

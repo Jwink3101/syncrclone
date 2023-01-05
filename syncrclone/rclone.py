@@ -7,9 +7,12 @@ from collections import deque, defaultdict
 import subprocess, shlex
 import lzma
 import time
+import re
+from itertools import zip_longest
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
-from . import debug, log
+from . import debug, log, MINRCLONE
 from .cli import ConfigError
 from .dicttable import DictTable
 from . import utils
@@ -38,6 +41,10 @@ class LockedRemoteError(ValueError):
     pass
 
 
+class RcloneVersionError(ValueError):
+    pass
+
+
 class Rclone:
     def __init__(self, config):
         self.config = config
@@ -62,8 +69,16 @@ class Rclone:
                 getattr(config, f"workdir{AB}"), self.backup_path0[AB]
             )
 
+        self.version_check()
+
+    def version_check(self):
         log("rclone version:")
-        self.call(["--version"], stream=True)
+        res = self.call(["--version"], stream=True)
+        ver = re.search(r"^rclone v(.*)$", res, flags=re.MULTILINE).group(1)
+        if tuple(map(int, ver.split("."))) < tuple(map(int, MINRCLONE.split("."))):
+            raise RcloneVersionError(
+                f"Must use rclone >= {MINRCLONE}. Currently using {ver}"
+            )
 
     def validate(self):
         config = self.config
@@ -342,31 +357,41 @@ class Rclone:
         """
         ## Optimization Notes
         #
+        # Note: This was previously heavily optimized to avoid overlapping remotes.
+        #       However, as of 1.59.0, this is no longer needed and these optimizations
+        #       have been undone.
+        #
         # rclone is faster if you can do many actions at once. For example, to delete
-        # files, it is faster to do `delete --files-from <list-of-files>`. However, for
-        # moves, you cannot have overlapping remotes. We therefore have a few different
-        # optimizations.
+        # files, it is faster to do `delete --files-from <list-of-files>`.
         #
         # NOTE: The order here is important!
         #
         #     Delete w/ backup: Depends on the remote and the workdir settings
-        #     (a) If a workdir is specified, *just* use `move --files-from`
+        #       Use `move --files-from` (ability added at 1.59.0)
         #
-        #     (b) If the remote supports moves:
-        #         Optimize at the root subdir level so that we do not overlap with .syncrclone
-        #         but can otherwise use `move --files-from`
+        #     Moves:
+        #       When the file name itself (leaf) changes, we must just do `moveto` calls.
+        #       Otherwise, we optimize moves when there there is more than one moved
+        #       file at a base directory such as when a directory is moved.
+        #       Note: we do NOT do directory moves but this is faster than moveto calls!
         #
-        #         The rootlevel ones will have to be a vanilla move. Add them.
-        #         See references below for why this can't just be one call.
+        #       Consider:
         #
-        #     (c) If the remote does not support moves: (i.e. it will internally
-        #         use copy+delete)
-        #           Add the files to backup, run that first, and then delete w/o backup
+        #         "A/deep/sub/dir/file1.txt" --> "A/deeper/sub/dir/file1.txt"
+        #         "A/deep/sub/dir/file2.txt" --> "A/deeper/sub/dir/file2.txt"
         #
-        #     Moves: No optimizations. One call for every file. :-(
+        #       The names ('file1.txt' and 'file2.txt') are the same and there are two
+        #       moves from "A/deep" to "A/deeper". Therefore, rather than call moveto
+        #       twice, we do:
+        #
+        #         rclone move "A/deep" "A/deeper" --files-from files.txt
+        #
+        #       Where 'files.txt' is:
+        #          sub/dir/file1.txt
+        #          sub/dir/file2.txt"
         #
         #     Backups:
-        #       Use the `copy --files-from`
+        #       Use the `copy/move --files-from`
         #
         #     Delete w/o backup
         #       Use `delete --files-from`
@@ -412,81 +437,63 @@ class Rclone:
         debug(AB, "moves", moves)
 
         ## Delete with backups
-        def _move_del(root_files):
-            root, files = root_files
-            cmd = cmd0.copy()
-            cmd[0] = "move"
+        cmd = cmd0.copy()
+        cmd[0] = "move"
 
-            tmpfile = self.tmpdir + f"/{AB}_movedel_del_b"
-            with open(tmpfile, "wt") as file:
-                file.write("\n".join(files))
+        cmd += ["--retries", "4"]  # Extra safe
 
-            src = utils.pathjoin(remote, root)
-            dst = utils.pathjoin(self.backup_path[AB], root)
+        tmpfile = self.tmpdir + f"/{AB}_movedel_del_nb"
+        with open(tmpfile, "wt") as file:
+            file.write("\n".join(dels_back))
 
-            cmd += ["--files-from", tmpfile, src, dst]
+        cmd += ["--files-from", tmpfile]
+        cmd += [remote, self.backup_path[AB]]
 
-            return "", self.call(cmd, stream=False, logstderr=False)
-
-        if getattr(config, f"workdir0{AB}"):  # Specified workdir. Not .syncrlcone
-            cmd = (
-                cmd0.copy()
-            )  # This is copied directly from below with minor changes. Probably could clean it up and use the same code path
-            cmd[0] = "move"
-
-            # we know the dest does not exists so speed it up
-            cmd += ["--no-traverse", "--no-check-dest", "--ignore-times"]
-            cmd += ["--retries", "4"]  # Extra safe
-
-            tmpfile = self.tmpdir + f"/{AB}_movedel_del_nb"
-            with open(tmpfile, "wt") as file:
-                file.write("\n".join(dels_back))
-
-            src = remote
-            dst = self.backup_path[AB]
-
-            cmd += ["--files-from", tmpfile, src, dst]
-            debug("Delete w/ backup", dels_back)
-            for line in self.call(cmd, stream=False, logstderr=False).split("\n"):
-                line = line.strip()
-                if line:
-                    log("rclone:", line)
-
-        elif self.move_support(AB) and dels_back:
-            rootdirs = defaultdict(list)
-            for file in dels_back:
-                dirpath, fname = os.path.split(file)
-                dirsplit = dirpath.split("/")
-                root = dirsplit[0]
-                ff = os.path.join(*(list(dirsplit[1:]) + [fname]))
-                rootdirs[root].append(ff)
-            debug(f"rootdirs prior {AB}", dict(rootdirs))
-
-            # Handle the root ones as vanilla moves
-            for file in rootdirs.pop("", []):
-                new = (file, os.path.join(".syncrclone", self.backup_path0[AB], file))
-                moves.append(new)
-                debug("root-level backup as move", new)
-
-            debug(f"rootdirs post {AB}", dict(rootdirs))
-
-            with ThreadPoolExecutor(max_workers=int(config.action_threads)) as exe:
-                for action, res in exe.map(_move_del, rootdirs.items()):
-                    log(action)
-                    for line in res.split("\n"):
-                        line = line.strip()
-                        if line:
-                            log("rclone:", line)
-        elif dels_back:
-            # Actually, could just use else here but I want to see in cov if its hit
-            # Add to backup and delete without backup
-            debug("Add to backup + delete", AB, dels_back)
-            backups.extend(dels_back)
-            dels_noback.extend(dels_back)
+        debug("Delete w/ backup", dels_back)
+        for line in self.call(cmd, stream=False, logstderr=False).split("\n"):
+            line = line.strip()
+            if line:
+                log("rclone:", line)
 
         ## Moves
-        def _move(file):
-            t = f"Move {shlex.quote(file[0])} --> {shlex.quote(file[1])}"
+        moveto = []  # src,dst
+        move = defaultdict(list)
+
+        for src, dst in moves:
+            src, dst = Path(src), Path(dst)
+            sparts = src.parts
+            dparts = dst.parts
+
+            # Need to zip_longest so that if one is shorter, you don't exhaust the
+            # loop before ixdiv increments
+            for ixdiv, (spart, dpart) in enumerate(
+                zip_longest(sparts[::-1], dparts[::-1])
+            ):
+                if spart != dpart:
+                    break
+
+            if ixdiv == 0:  # different name. Must moveto
+                moveto.append((str(src), str(dst)))
+                continue
+
+            srcdir = os.path.join(*sparts[:-ixdiv]) if sparts[:-ixdiv] else ""
+            dstdir = os.path.join(*dparts[:-ixdiv]) if dparts[:-ixdiv] else ""
+            file = os.path.join(*sparts[-ixdiv:])  # == dparts[-ixdiv:]
+            # break
+            move[srcdir, dstdir].append(file)
+
+        # Now if only one item is being moved, we change it back to a moveto
+        # copy so I can modify move in place
+        for (srcdir, dstdir), files in move.copy().items():
+            if len(files) > 1:
+                continue
+            src = os.path.join(srcdir, files[0])
+            dst = os.path.join(dstdir, files[0])
+            moveto.append((src, dst))
+            del move[srcdir, dstdir]
+
+        def _moveto(file):
+            t = f"Move {repr(file[0])} --> {repr(file[1])}"
             src = utils.pathjoin(remote, file[0])
             dst = utils.pathjoin(remote, file[1])
 
@@ -496,12 +503,31 @@ class Rclone:
             return t, self.call(cmd, stream=False, logstderr=False)
 
         with ThreadPoolExecutor(max_workers=int(config.action_threads)) as exe:
-            for action, res in exe.map(_move, moves):
+            for action, res in exe.map(_moveto, moveto):
                 log(action)
                 for line in res.split("\n"):
                     line = line.strip()
                     if line:
                         log("rclone:", line)
+
+        for ii, ((srcdir, dstdir), files) in enumerate(move.items()):
+            log(f"Grouped Move {repr(srcdir)} --> {repr(dstdir)}")
+            for file in files:
+                log(f"  {repr(file)}")
+
+            flistpath = self.tmpdir + f"move_{ii}.txt"
+            with open(flistpath, "wt") as fout:
+                fout.write("\n".join(files))
+
+            cmd = cmd0.copy()
+            cmd[0] = "move"
+            cmd += [
+                utils.pathjoin(remote, srcdir),
+                utils.pathjoin(remote, dstdir),
+                "--files-from",
+                flistpath,
+            ]
+            self.call(cmd, stream=True)
 
         ## Backups
         if backups:
@@ -516,8 +542,6 @@ class Rclone:
                 cmd[0] = "move"
                 debug("Always using move")
 
-            # we know the dest does not exists so speed it up
-            cmd += ["--no-traverse", "--no-check-dest", "--ignore-times"]
             cmd += ["--retries", "4"]  # Extra safe
 
             tmpfile = self.tmpdir + f"/{AB}_movedel_back"

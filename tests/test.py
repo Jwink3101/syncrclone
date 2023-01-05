@@ -1381,6 +1381,11 @@ def test_prepost_error(stop_on_shell_error):
     "nomovesA,nomovesB", [(0, 0), (1, 0), (0, 1), (1, 1), (None, None)]
 )
 def test_disable_moves(nomovesA, nomovesB):
+    """
+    This test is largely irrelevant since we no longer (as of 20230105) have
+    different code paths as to whether or not the remote supports moves when implementing
+    a move
+    """
     remoteA = "A"
     remoteB = "B"
     set_debug(False)
@@ -1425,24 +1430,6 @@ def test_disable_moves(nomovesA, nomovesB):
     assert exists("B/.syncrclone/backups/*_B/subdirA/del2A.txt")
 
     stdout = "".join(test.synclogs[-1])
-
-    linesA = [
-        ("DEBUG: Add to backup + delete A [", nomovesA),
-        ("rootdirs prior A", not nomovesA),
-        ("root-level backup as move ('delB.txt',", not nomovesA),
-        ("rootdirs post A", not nomovesA),
-    ]
-    for lineA, tt in linesA:
-        assert (lineA in stdout) == tt, (lineA, tt)
-
-    linesB = [
-        ("DEBUG: Add to backup + delete B [", nomovesB),
-        ("rootdirs prior B", not nomovesB),
-        ("root-level backup as move ('delA.txt',", not nomovesB),
-        ("rootdirs post B", not nomovesB),
-    ]
-    for lineB, tt in linesB:
-        assert (lineB in stdout) == tt, (lineB, tt)
 
     os.chdir(PWD0)
 
@@ -1548,26 +1535,6 @@ def test_tempdir():
     )
     assert os.path.exists("testdirs/main/temp/")
 
-    # Make sure that the temp files are (a) here and (b) these are them
-    tmpfiles = set(os.listdir("testdirs/main/temp"))
-    expected = {
-        "A_curr",
-        "A_movedel_back",
-        "A_movedel_del_b",
-        "A_prev",
-        "B_curr",
-        "B_movedel_back",
-        "B_movedel_del_b",
-        "B_prev",
-        "B_update_hash",
-        "log",
-    }
-    assert expected - tmpfiles == set()
-
-    # Still expect stdout and stderr
-    remain = tmpfiles - expected
-    assert all(re.match(r"^std\.[0-9]{19}\.(out|err)$", name) for name in remain)
-
     os.chdir(PWD0)
 
 
@@ -1622,25 +1589,114 @@ def test_hash_compare_sync():
     assert diffs == set()
 
 
+def test_directory_moves():
+    """
+    This tests when directories are moved around. syncrclone does NOT move directories,
+    only files, but the end result needs to be correct.
+    
+    This was more used to develop an optimized file move but it also tests some of the 
+    edge cases should directory moves ever be used
+    
+    This test was borrowed from rirb
+    """
+    test = testutils.Tester("dirmove", "A", "B")
+
+    test.config.renamesA = "hash"
+    test.config.renamesB = "hash"
+    test.config.compare = "hash"
+    test.config.filter_flags = ["--exclude", "*.exc", "--exclude", "no/**"]
+    test.write_config()
+
+    test.write_pre("A/dir-move-all/file1.txt", "file.")
+    test.write_pre("A/dir-move-all/file2.txt", "file..")
+
+    test.write_pre("A/dir-move-all-replace/file3.txt", "file...")
+    test.write_pre("A/file4.txt", "file....")
+
+    test.write_pre("A/dir-move-some/file5.txt", "file.....")
+    test.write_pre("A/dir-move-some/file6-keep.txt", "file......")
+
+    test.write_pre("A/dir-move-exc/file7.txt", "file.......")
+    test.write_pre("A/dir-move-exc/file8.exc", "file........")
+
+    test.write_pre("A/dir-move-excdir/file9.txt", "file.........")
+    test.write_pre("A/dir-move-excdir/no/file10.txt", "file..........")
+    test.write_pre("A/dir-move-excdir/yes/file11.txt", "file...........")
+
+    test.write_pre("A/dir-move-withsub/file12.txt", "file............")
+    test.write_pre("A/dir-move-withsub/sub/file13.txt", "file.............")
+
+    test.write_pre("A/sub1/sub2/sub3/sub4/sub5/file14.txt", "file..............")
+    test.write_pre("A/sub1/sub2/sub3/sub4/sub5/file15.txt", "file...............")
+
+    test.write_pre("A/s1/s2/s3/s4/s5/file16.txt", "file................")
+    test.write_pre("A/s1/s2/s3/s4/s5/file17.txt", "file.................")
+
+    test.write_pre("A/D1/D2/file18.txt", "file..................")
+
+    test.setup()
+
+    ##########
+
+    shutil.move("A/dir-move-all", "A/dir-MOVED-all")
+
+    shutil.move("A/dir-move-all-replace/", "A/dir-MOVED-all-replace/")
+    test.move("A/file4.txt", "A/dir-move-all-replace/file4.txt")
+
+    test.move("A/dir-move-some/file5.txt", "A/dir-MOVED-some/file5.txt")
+
+    shutil.move("A/dir-move-exc/", "A/dir-MOVED-exc/")
+
+    shutil.move("A/dir-move-excdir/", "A/dir-MOVED-excdir/")
+
+    shutil.move("A/dir-move-withsub/", "A/dir-MOVED-withsub/")
+
+    shutil.move("A/sub1/sub2/sub3/sub4/sub5/", "A/sub1/subTwo/subThree/sub4/sub5/")
+    shutil.move("A/s1/s2/s3/s4/s5/", "A/new/sub/")
+
+    os.makedirs("A/dd1/D2/")
+    shutil.move("A/D1/D2/file18.txt", "A/dd1/D2/file-18.txt")
+
+    test.sync()
+
+    assert test.compare_tree() == {
+        ("missing_inA", "dir-move-excdir/no/file10.txt"),
+        ("missing_inB", "dir-MOVED-exc/file8.exc"),
+        ("missing_inA", "dir-move-exc/file8.exc"),
+        ("missing_inB", "dir-MOVED-excdir/no/file10.txt"),
+    }
+
+    os.chdir(PWD0)
+
+
 if __name__ == "__main__":
-    #     test_main(
-    #         # remoteA,renamesA,workdirA,remoteB,renamesB,workdirB,compare
-    #         "A",
-    #         "mtime",
-    #         None,
-    #         "B",
-    #         "hash",
-    #         None,
-    #         "size",
-    #         debug=False,
-    #         avoid_relist=False,
-    #     )  # Vanilla test covered below
+    test_main(
+        # remoteA,renamesA,workdirA,remoteB,renamesB,workdirB,compare
+        "A",
+        "mtime",
+        None,
+        "B",
+        "hash",
+        None,
+        "size",
+        debug=False,
+        avoid_relist=False,
+    )  # Vanilla test covered below
 
     #     test_main(
     #         # remoteA,renamesA,workdirA,remoteB,renamesB,workdirB,compare
     #         "A", "size", "Awork", "B", "size", "Bwork", "size"
     #     )  # Vanilla test covered below
-    #
+    #     test_main(
+    #         # remoteA,renamesA,workdirA,remoteB,renamesB,workdirB,compare
+    #         "A",
+    #         "size",
+    #         None,
+    #         "B",
+    #         "size",
+    #         None,
+    #         "size",
+    #     )  # Vanilla test covered below
     # Test with workdirs
     #     test_main(
     #         "cryptA:main",
@@ -1712,8 +1768,9 @@ if __name__ == "__main__":
     #     test_cli_override()
     #     test_reset_state()
     #     test_workdir_overlap()
-    test_tempdir()
+    #     test_tempdir()
     #     test_hash_compare_sync()
+    #     test_directory_moves()
 
     # hacked together parser. This is used to manually test whether the interactive
     # mode is working
