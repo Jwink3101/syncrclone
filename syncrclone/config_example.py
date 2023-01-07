@@ -232,11 +232,15 @@ renamesB = None
 save_logs = True
 local_log_dest = ""  # NOT on a remote
 
-## Pre- and Post-run
+## Pre- and Post-shell commands to run
 # Specify shell code to be evaluated before and/or after running syncrclone. Note
 # these are all run from the directory of this config (as with everything else).
 # STDOUT and STDERR will be captured. Note that there is no validation or
 # security of the inputs. These are not actually called if using dry-run.
+#
+# The post shell call also has the "$STATS" environment variable defined which has
+# the run statistics including timing (which will be different than the final since
+# the logs will not yet have been dumped)
 #
 # Can be specified as the following:
 #
@@ -244,13 +248,19 @@ local_log_dest = ""  # NOT on a remote
 #              Can cd as needed and can be multiple lines and multiple commands.
 #     list   : Will execute with shell=False in the parent directory to this file.
 #     dict   : Specify subprocess.Popen flags plus the keyword 'cmd'. YOU decide if
-#              shell should be True or False based on 'cmd'. Will overwrite settings
-#              for std(out/err). Will update current environ with any 'env' settings.
+#              shell should be True or False based on 'cmd'. syncrclone will override settings
+#              for std(out/err). Will update os.environ with any 'env' settings.
+#
+# If the final cmd (specified directly as a list or a list inside the dict), each
+# command will be run through C-style formatting. C-Style is used to not break the
+# more-common str.format (or f-string) formats that may exist.
+# os.environ may be updated with `env` inside of a dict.
+#
+# Example:
+#   post_shell = 'echo "$STATS"'
+#   post_shell = ["echo","%(STATS)s"]
+# will look the same
 pre_sync_shell = ""
-
-# The _post_ shell call also has "$STATS" defined which prints the run statistics and
-# "$LOGNAME" which is the defined log name '{name}_{date}.log'
-# The timing will be different than that of the final log as it is run sooner.
 post_sync_shell = ""
 
 # Be default, even if the shell commands had an error, syncrclone out continue.
@@ -266,7 +276,7 @@ stop_on_shell_error = False
 # NOTE: It is *highly* suggested that you use something unique for each config and/or
 #       run so as to not clobber each other. See (commented) suggestion
 tempdir = None  # tempfile.TemporaryDirectory().name
-# import time; tempdir = f"/tmp/{name}/{time.time}
+# import time; tempdir = f"/tmp/{name}/{time.time_ns()}
 
 #######
 # This should only be changed by the user when migrating from an older config

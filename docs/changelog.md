@@ -2,6 +2,10 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20230107.0.BETA
+
+- Added C-Style formatting to pre-, post-, fail-shell commands when specified as a list or list inside a dict. Used C-Style to help reduce escaping needed of str.format and bracket.
+
 ## 20230105.0.BETA
 
 - Undoes some (extensive) optimization to avoid overlapping remotes. Prior to rclone 1.59.0 (documented in 1.60.0), you could not have moves that overlap even if the destination was filtered. This was changed in [PR #6312](https://github.com/rclone/rclone/pull/6312) so we can undo this optimization. **NOTE**: This will break compatibility with rclone versions less than 1.59.0!

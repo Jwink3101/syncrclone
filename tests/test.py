@@ -1249,19 +1249,23 @@ def test_prepost_script(dry):
     remoteB = "B"
     set_debug(False)
 
+    os.environ["test_str"] = "success"
+
     test = testutils.Tester("prepost_script", remoteA, remoteB)
     test.config.pre_sync_shell = """\
         myvarPRE=pre-test
         echo pretest $myvarPRE
         echo eee 1>&2
         """
+    # Test bash filling the environment ($STATS) and Python doing it (%(test_str)s)
     test.config.post_sync_shell = [
         "/bin/bash",
         "-c",
         """\
         myvarPOST=post-test
         echo posttest $myvarPOST
-        echo "$STATS" """,
+        echo "$STATS" 
+        echo test_str: %(test_str)s """,
     ]
 
     test.write_config()
@@ -1273,7 +1277,6 @@ def test_prepost_script(dry):
         test.setup()
 
     log = "".join(test.synclogs[-1])
-
     assert "$         myvarPRE=pre-test" in log
     assert "$         echo pretest $myvarPRE" in log
     assert "$         echo eee 1>&2" in log
@@ -1284,11 +1287,13 @@ def test_prepost_script(dry):
         assert "STDOUT: posttest post-test" not in log
         assert "A: New 0 | Deleted 0 | Backed Up 0 | Moved 0" not in log
         assert "STDERR: eee" not in log
+        assert "test_str: success" not in log
     else:
         assert "STDOUT: pretest pre-test" in log
         assert "STDOUT: posttest post-test" in log
         assert "A: New 0 | Deleted 0 | Backed Up 0 | Moved 0" in log
         assert "STDERR: eee" in log
+        assert "test_str: success" in log
 
     # Test with Popen settings
     test.write_post("B/fileA.txt", "DA")
@@ -1306,6 +1311,7 @@ def test_prepost_script(dry):
                            "TEST1":os.environ.get("TEST1","FAIL"),
                            "cwd":os.getcwd(),}
                     print(f"CAPTURE>>>{json.dumps(res)}<<<CAPTURE")
+                    print("test_str: %(test_str)s")
                      """
             ),
         ],
@@ -1324,6 +1330,7 @@ def test_prepost_script(dry):
     matches = re.findall("CAPTURE>>>(.*?)<<<CAPTURE", log)
     if dry:
         assert len(matches) == 1  # just listing
+        assert "test_str: success" not in log
     else:
         assert len(matches) == 2  # listing and then actual results
         pre_dict = json.loads(matches[1])
@@ -1331,6 +1338,7 @@ def test_prepost_script(dry):
         assert pre_dict.pop("TEST1") == "pre dict env"
         assert pre_dict.pop("cwd") == os.path.expanduser("~")
         assert len(pre_dict) == 0  # Should be nothing left
+        assert "test_str: success" in log
 
     os.chdir(PWD0)
 

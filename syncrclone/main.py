@@ -818,6 +818,14 @@ class SyncRClone:
         if not pre:
             environ["STATS"] = self.stats()
 
+        # Apply formatting. Uses the C-Style so that it is less likely to
+        # have to need escaping
+        if isinstance(cmds, (list, tuple)):
+            cmds0 = cmds.copy()
+            cmds = [cmd % environ for cmd in cmds]
+            if cmds != cmds0:
+                debug(f"Formatted cmds: {cmds}")
+
         proc = subprocess.Popen(
             cmds,
             shell=shell,
