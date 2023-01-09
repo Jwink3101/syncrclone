@@ -2,6 +2,10 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20230109.0.BETA
+
+- Fixed version parsing bug. Also makes it not fail if it can't parse. Closes #27
+
 ## 20230107.0.BETA
 
 - Added C-Style formatting to pre-, post-, fail-shell commands when specified as a list or list inside a dict. Used C-Style to help reduce escaping needed of str.format and bracket.

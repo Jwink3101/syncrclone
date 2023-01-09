@@ -74,7 +74,12 @@ class Rclone:
     def version_check(self):
         log("rclone version:")
         res = self.call(["--version"], stream=True)
-        ver = re.search(r"^rclone v(.*)$", res, flags=re.MULTILINE).group(1)
+        rever = re.search(r"^rclone v?(.*)$", res, flags=re.MULTILINE)
+        if not rever:
+            log("WARNING: Could not parse rclone version number.")
+            log(f"         Minimum version: {MINRCLONE}")
+            return
+        ver = rever.group(1)
         if tuple(map(int, ver.split("."))) < tuple(map(int, MINRCLONE.split("."))):
             raise RcloneVersionError(
                 f"Must use rclone >= {MINRCLONE}. Currently using {ver}"
