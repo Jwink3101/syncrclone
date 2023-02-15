@@ -21,10 +21,10 @@ class ExcludedAttributeError(ValueError):
 class DictTable(object):
     """
     DictTable:
-    Create an in-memeory single table DB from a list of dictionaries that may 
+    Create an in-memeory single table DB from a list of dictionaries that may
     be queried by any specified attribute.
 
-    This is useful since, once created, lookup/query/"in" checks are O(1), 
+    This is useful since, once created, lookup/query/"in" checks are O(1),
     Creation is still O(N)
 
     Note: Unless an entry is changed with update(), it must be reindexed!
@@ -38,26 +38,26 @@ class DictTable(object):
     fixed_attributes [None] (list, None)
         Specify _specific_ attributes to index for each item. Will *only* index
         them unless add_fixed_attribute('new_attribute') is called.
-        
+
         If None, will use _all_ attributes *except* those of exclude_attributes
-        
+
     exclude_attributes [ *empty* ] (list)
-        Attributes that shouldn't ever be added even if attributes=None for 
+        Attributes that shouldn't ever be added even if attributes=None for
         dynamic addition of attributes.
-        
+
     Multiple Values per attribute
     -----------------------------
     A "row" can have multiple values per attribute as follows:
-        
+
         {'attribute':[val1,val2,val3]}
-        
+
     and can be queried for any (or all) values.
-    
+
     Additional Opperations:
     ----------------------
     This supports index-lookup with a dictionary as well as
     a python `in` check and lookup by a dictionary
-    
+
     The code will allow you to edit/delete/update multiple items at once
     (just like a standard database). Use with caution.
 
@@ -65,14 +65,13 @@ class DictTable(object):
     ------
     * You can simply dump the DB with JSON using the DB.items()
       and then reload it with a new DB
-    
+
     * There is also an attribute called `_index` which can be used to
       query by index.
 
     """
 
     def __init__(self, items=None, fixed_attributes=None, exclude_attributes=None):
-
         # These are used to make sure the DB.Query is (a) from this DB and (b)
         # the DB hasn't changed. This *should* always be the case
         self._id = unicode(uuid.uuid4())
@@ -134,26 +133,26 @@ class DictTable(object):
         """
         Query the value for attribute. Will always an iterator. Use
         `list(DB.query())` to return a list
-        
+
         Usage
         -----
-        
+
         Any combination of the following will works
-        
+
         Keywords: Only check equality
-                   
+
         >>> DB.query(attrib=val)
         >>> DB.query(attrib1=val1,attrib2=val2)  # Match both
-        
+
         >>> DB.query({'attrib':val})
         >>> DB.query({'attrib1':val1,'attrib2':val2}) # Match Both
-                                      
+
         Query Objects (DB.Q, DB.Query)
-        
+
         >>> DB.query(DB.Q.attrib == val)
         >>> DB.query( (DB.Q.attrib1 == val1) &  (DB.Q.attrib1 == val2) )  # Parentheses are important!
         >>> DB.query( (DB.Q.attrib1 == val1) &  (DB.Q.attrib1 != val2) )
-                                   
+
         """
         ixs = self._ixs(*args, **kwargs)
         for ix in ixs:
@@ -162,7 +161,7 @@ class DictTable(object):
     def query_one(self, *args, **kwargs):
         """
         Return a single item from a query. See "query" for more details.
-        
+
         Returns None if nothing matches
         """
         try:
@@ -173,8 +172,8 @@ class DictTable(object):
     def pop(self, *args, **kwargs):
         """
         Query, delete, and return item.
-        
-        Will raise a ValueError if more than one item will be deleted 
+
+        Will raise a ValueError if more than one item will be deleted
         Will raise a KeyError if there is no item to delete. Does *NOT* support a default
         """
         ixs = self._ixs(*args, **kwargs)
@@ -197,7 +196,7 @@ class DictTable(object):
     def isin(self, *args, **kwargs):
         """
         Check if there is at least one item that matches the given query
-        
+
         see query() for usage
         """
         return self.count(*args, **kwargs) > 0
@@ -205,14 +204,14 @@ class DictTable(object):
     def reindex(self, *attributes):
         """
         Reindex the dictionary for specified attributes (or all)
-        
+
         Usage
         -----
-        
+
         >>> DB.reindex()                # All
         >>> DB.reindex('attrib')        # Reindex 'attrib'
         >>> DB.reindex('attrib1','attrib2') # Multiple
-        
+
         See Also
         --------
             update() method which does not require reindexing
@@ -237,27 +236,27 @@ class DictTable(object):
         """
         Update an entry without needing to reindex the DB (or a specific
         attribute)
-        
+
         Usage:
         ------
-        
+
         >>> DB.update(updated_dict, query_dict_or_Query, query_attrib1=val1,...)
         >>> DB.update(updated_dict, query_attrib1=val1,...)
-        
+
         Inputs:
         -------
-        
+
         updated_dict : Dictionary with which to update the entry. This is
                        done using the typical dict().update() construct to
                        overwrite it
-        
+
         query_dict_or_Query
                      : Either the dictionary used in the query or a Query that
                        defines a more advanced query
-        
+
         query_attrib1=val1
                      : Additional (or sole) query attributes
-    
+
         Notes:
         ------
             * Updating an item requires a deletion in a list that has length n
@@ -312,7 +311,7 @@ class DictTable(object):
         """
         Adds a fixed attribute. If there are NO fixed attributes (i.e. it is
         dynamic attributes), do *NOT* add them unless force.
-        
+
         Will reindex either way
         """
         if attrib in self.exclude_attributes:
@@ -368,7 +367,7 @@ class DictTable(object):
     def Query(self):
         """
         Query object already loaded with the DB
-        
+
             DB.Query <==> DB.Q
         """
         return Query(self)
@@ -553,12 +552,12 @@ class Query(object):
     """
     Query objects. This works by returning an updated *copy* of the object
     whenever it is acted upon
-    
+
     Calling
         * Q.attribute sets attribute and returns a copy
         * Q.attribute == val (or any other comparison) set the index of elements
         * Q1 & Q1 or other boolean perform set operations
-        
+
     Useful Methods:
         _filter : (or just `filter` if not an attribute): Apply a filter
                   to the DB
@@ -582,10 +581,10 @@ class Query(object):
         """
         If 'filter' is NOT an attribute of the DB, this can be called
         with 'filter' instead of '_filter'
-        
+
         Apply a filter to the data that returns True if it matches and False
         otherwise
-        
+
         Note that filters are O(N)
         """
         self._valid()  # Actually, these would still work but still check

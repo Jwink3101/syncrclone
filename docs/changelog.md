@@ -2,6 +2,13 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20230215.0.BETA
+
+- Bug Fix: Closes #28. Parsing versions gives non critical errors if it can't.
+- Minor:
+    - Changed how --override is parsed so that it is included *before* and *after* the rest of the config. This lets you set behavior for inside.
+    - Ran a newer version of the Black formatter
+
 ## 20230109.0.BETA
 
 - Fixed version parsing bug. Also makes it not fail if it can't parse. Closes #27

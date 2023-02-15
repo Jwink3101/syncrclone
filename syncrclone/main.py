@@ -370,7 +370,7 @@ class SyncRClone:
 
     def process_non_common(self):
         """
-        Create action lists (some need more processing) and then populate 
+        Create action lists (some need more processing) and then populate
         with all remaining files
         """
         config = self.config

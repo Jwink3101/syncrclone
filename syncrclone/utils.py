@@ -77,15 +77,15 @@ def add_hash_compare_attribute(*filelists):
 
     * Some lists have different hashes. Maybe rclone added a new hash type
       and this is a local remote?
-    
+
     * Not all files will have all hashes. This can happen to S3 files that
       do not get a final hash (I think. I've yet to see it)
-    
+
     Inputs:
     ------
     filelist1,filelist2,...,filelistN
         DictTable filelists
-      
+
     """
     # In rclone 1.56, the hash names were changed. This is an optional mapping to
     # to keep them together. It does has a slight performance penalty so I will
@@ -140,11 +140,11 @@ def bytes2human(byte_count, base=1024, short=True):
 
     best = 0
     for ii in range(len(labels)):
-        if (byte_count / (base ** ii * 1.0)) < 1:
+        if (byte_count / (base**ii * 1.0)) < 1:
             break
         best = ii
 
-    return byte_count / (base ** best * 1.0), labels[best] + name
+    return byte_count / (base**best * 1.0), labels[best] + name
 
 
 def file_summary(files):
@@ -162,7 +162,7 @@ def unix2iso(mtime):
 
 def search_upwards(pwd):
     """
-    Search upwards for `.syncrclone/config.py`        
+    Search upwards for `.syncrclone/config.py`
     """
     pwd = pwd = os.path.abspath(pwd)
     configpwd = os.path.join(pwd, ".syncrclone", "config.py")
@@ -203,7 +203,7 @@ def pathjoin(*args):
     """
     This is like os.path.join but does some rclone-specific things because there could be
     a ':' in the first part.
-    
+
     The second argument could be '/file', or 'file' and the first could have a colon.
         pathjoin('a','b')   # a/b
         pathjoin('a:','b')  # a:b
@@ -231,9 +231,9 @@ class ReturnThread(Thread):
     """
     Like a regular thread except when you `join`, it returns the function
     result. And .start() will return itself to enable cleaner code.
-    
+
         >>> mythread = ReturnThread(...).start() # instantiate and start
-    
+
     Note that target is a required keyword argument.
     """
 

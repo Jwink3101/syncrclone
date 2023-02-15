@@ -67,7 +67,7 @@ class Config:
 
         debug(f"Wrote template config to {outpath}")
 
-    def parse(self, skiplog=False, text=None):
+    def parse(self, skiplog=False, override=""):
         if self._configpath is None:
             raise ValueError("Must have a config path")
 
@@ -77,12 +77,14 @@ class Config:
         self._config["__dir__"] = os.path.dirname(self._config["__file__"])
         self._config["__CPU_COUNT__"] = os.cpu_count()
 
-        if not text:
-            exec(self._template, self._config)  # Only reset if reading
-            with open(self._configpath, "rt") as file:
-                os.chdir(self._config["__dir__"])  # Globally set the program here
-                text = file.read()
-        exec(text, self._config)
+        exec(self._template, self._config)  # Only reset if reading
+
+        with open(self._configpath, "rt") as file:
+            os.chdir(self._config["__dir__"])  # Globally set the program here
+            text = file.read()
+
+        # Add the override text before and after in case it sets functionality
+        exec(override + "\n\n" + text + "\n\n" + override, self._config)
 
         # clean up all of the junk
         _tmp = {}
@@ -92,8 +94,9 @@ class Config:
         for key in ["log", "print", "debug"]:
             self._config.pop(key, None)
 
-        # Validate
+        self.validate(skiplog=skiplog)
 
+    def validate(self, skiplog=False):
         # versions. This can be changed in the future if things are broken
         config_ver = self._config["_syncrclone_version"].split(".")
         if config_ver != ["__VERSION__"]:
@@ -347,12 +350,13 @@ def cli(argv=None):
         if not os.path.exists(cliconfig.configpath):
             raise ConfigError(f"config file '{cliconfig.configpath}' does not exist")
 
-        config.parse()  # NOTE: This now changes where the entire program is executed to the path of that file!
-
         if cliconfig.override:
             for item in cliconfig.override:
                 log(f"CLI Override: {item}")
-            config.parse(text="\n".join(cliconfig.override), skiplog=True)
+
+        config.parse(
+            override="\n".join(cliconfig.override)
+        )  # NOTE: This now changes where the entire program is executed to the path of that file!
 
         noback = cliconfig.no_backup
         del cliconfig.no_backup  # == to pop

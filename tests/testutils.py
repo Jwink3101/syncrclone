@@ -217,7 +217,7 @@ class Tester:
 
     def write_post(self, path, content, mode="wt", add_dt=0):
         """
-        Write items randomly in the future. Can add even more if forcing 
+        Write items randomly in the future. Can add even more if forcing
         newer
         """
         dt = 5 * (1 + random.random()) + add_dt
@@ -245,7 +245,7 @@ class Tester:
         shutil.move(src, dst)
 
     def compare_tree(self, A="A", B="B"):
-        """ All file systems are identical"""
+        """All file systems are identical"""
         result = set()
 
         filesA = set(os.path.relpath(f, A) for f in tree(A))
@@ -253,7 +253,6 @@ class Tester:
 
         filesAB = filesA.union(filesB)
         for fileAB in sorted(list(filesAB)):
-
             fileA = os.path.join(A, fileAB)
             fileB = os.path.join(B, fileAB)
             try:
@@ -333,10 +332,10 @@ class WEBDAV:
         print("END WEBDAV")
 
 
-def adler32(filepath, blocksize=2 ** 20):
+def adler32(filepath, blocksize=2**20):
     """
     Return the ader32 of a file as an 8-byte hex number
-    
+
     `blocksize` adjusts how much of the file is read into memory at a time.
     This is useful for large files.
         2**20 = 1024 * 1024 = 1 mb
@@ -357,7 +356,7 @@ def adler32(filepath, blocksize=2 ** 20):
 
 
 def change_time(path, time_adj):
-    """ Change the time on a file path"""
+    """Change the time on a file path"""
     stat = os.stat(path)
     os.utime(path, (stat.st_atime + time_adj, stat.st_mtime + time_adj))
 

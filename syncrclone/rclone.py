@@ -72,18 +72,25 @@ class Rclone:
         self.version_check()
 
     def version_check(self):
+        """
+        Check the rclone version and raise an error if it doesn't match.
+        I have been struggling with edge cases on this regex (e.g., #27 and #28)
+        but it also isn't critical so wrap everything in a try block.
+        """
         log("rclone version:")
         res = self.call(["--version"], stream=True)
-        rever = re.search(r"^rclone v?(.*)$", res, flags=re.MULTILINE)
-        if not rever:
+        try:
+            rever = re.search(r"^rclone v?(.*)$", res, flags=re.MULTILINE)
+            ver = rever.group(1)  # Will raise attribute error if could not parse
+            if tuple(map(int, ver.split("."))) < tuple(map(int, MINRCLONE.split("."))):
+                raise RcloneVersionError(
+                    f"Must use rclone >= {MINRCLONE}. Currently using {ver}"
+                )
+        except RcloneVersionError:
+            raise
+        except:
             log("WARNING: Could not parse rclone version number.")
             log(f"         Minimum version: {MINRCLONE}")
-            return
-        ver = rever.group(1)
-        if tuple(map(int, ver.split("."))) < tuple(map(int, MINRCLONE.split("."))):
-            raise RcloneVersionError(
-                f"Must use rclone >= {MINRCLONE}. Currently using {ver}"
-            )
 
     def validate(self):
         config = self.config
@@ -228,16 +235,16 @@ class Rclone:
         """
         Get both current and previous file lists. If prev_list is
         set, then it is not pulled.
-        
+
         Options:
         -------
         prev_list (list or DictTable)
             Previous file list. Specify if it is already known
-        
+
         remote
             A or B
-        
-        
+
+
         It will decide if it needs hashes and whether to reuse them based
         on the config.
         """
@@ -278,7 +285,11 @@ class Rclone:
         )
 
         cmd.extend(
-            ["-R", "--no-mimetype", "--files-only",]  # Not needed so will be faster
+            [
+                "-R",
+                "--no-mimetype",
+                "--files-only",
+            ]  # Not needed so will be faster
         )
 
         cmd.append(remote)
@@ -750,7 +761,7 @@ class Rclone:
         """
         Remove the directories in dirlist. dirlist is sorted so the deepest
         go first and then they are removed. Note that this is done this way
-        since rclone will not delete if *anything* exists there; even files 
+        since rclone will not delete if *anything* exists there; even files
         we've ignored.
         """
         config = self.config
@@ -818,7 +829,7 @@ class Rclone:
     def copy_support(self, remote):
         """
         Return whether or not the remote supports  server-side copy
-        
+
         Defaults to False for safety
         """
         r = self.features(remote).get("Copy", False)
@@ -828,7 +839,7 @@ class Rclone:
     def move_support(self, remote):
         """
         Return whether or not the remote supports  server-side move
-        
+
         Defaults to False for safety
         """
         r = self.features(remote).get("Move", False)
@@ -838,7 +849,7 @@ class Rclone:
     def empty_dir_support(self, remote):
         """
         Return whether or not the remote supports empty-dirs
-        
+
         Defaults to True since if it doesn't support them, calling rmdirs
         will just do nothing
         """

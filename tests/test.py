@@ -101,9 +101,9 @@ def test_main(
     """
     Main test with default settings (if the defaults change, this will need to
     be updated. A few minor changes from the defaults are also made
-    
+
     More edge cases and specific settings are played with later
-    
+
     """
     set_debug(debug)
     if not config:
@@ -381,17 +381,17 @@ def test_avoid_relist():
 def test_move_attribs(attrib):
     """
     Test moves over various conditions for each type of move tracking
-    including modified sizes. 
-    
+    including modified sizes.
+
     7 files: 1,2,3,C,D,4,5 all have different mtimes and are moved
-    
-    - 1,2 are unique content and size 
+
+    - 1,2 are unique content and size
     - 3,C are unique content but same size
     - D,4 are the same content and size
     - 5 is unique content and size but it's modified
-    
+
     See Truth Table in the code
-    
+
     Only test with local A. B doesn't matter since
     moves are only tracked on A.
     """
@@ -975,7 +975,7 @@ def test_redacted_PW_and_modules_in_config_file():
     """
     Tests that RCLONE_CONFIG_PASS is redacted in debug mode. (even though
     it isn't needed. rclone will just ignore it)
-    
+
     Also tests when you import modules in the config since that was
     an issue and has now been fixed.
     """
@@ -1003,10 +1003,10 @@ def test_and_demo_exclude_if_present():
     """
     The --exclude-if-present can lead to issues as the filters cannot be applied
     symmetrically to both sides and can make an exclude look like a delete
-    
+
     Demonstrate (a) it working properly when on both sides and (b)
     the issues it can cause
-    
+
     """
     test = testutils.Tester("exclude_present", "A", "B")
 
@@ -1514,7 +1514,7 @@ def test_reset_state():
 def test_workdir_overlap():
     """
     An rclone update broke this test potentially a change in allowing more overlap.
-    
+
     TODO: Fix or determine this is now a *good* thing!?!?!
     """
     # Just call main on some test cases
@@ -1549,10 +1549,10 @@ def test_tempdir():
 def test_hash_compare_sync():
     """
     tests the issue of a hash-based compare on identically timed and sized files failing.
-    
-    This happens because the final sync lets rclone decide what to do in order to 
+
+    This happens because the final sync lets rclone decide what to do in order to
     eliminate retries doing it all again (as would be the case with `--ignore-times`).
-    
+
     But it means that you can trick it. You could tell rclone to use --checksum but that
     would be slow.
     """
@@ -1601,10 +1601,10 @@ def test_directory_moves():
     """
     This tests when directories are moved around. syncrclone does NOT move directories,
     only files, but the end result needs to be correct.
-    
-    This was more used to develop an optimized file move but it also tests some of the 
+
+    This was more used to develop an optimized file move but it also tests some of the
     edge cases should directory moves ever be used
-    
+
     This test was borrowed from rirb
     """
     test = testutils.Tester("dirmove", "A", "B")

@@ -13,7 +13,9 @@ setup(
     name="syncrclone",
     packages=["syncrclone"],
     long_description=open("readme.md").read(),
-    entry_points={"console_scripts": ["syncrclone=syncrclone.cli:cli"],},
+    entry_points={
+        "console_scripts": ["syncrclone=syncrclone.cli:cli"],
+    },
     version=syncrclone.__version__,
     description="Python-based bi-directional sync tool for rclone",
     url="https://github.com/Jwink3101/syncrclone",
