@@ -102,7 +102,9 @@ class Rclone:
                         f"'{attr}' cannot have '{v}' or any other filtering flags"
                     )
 
-    def call(self, cmd, stream=False, logstderr=True, display_error=True):
+    def call(
+        self, cmd, stream=False, logstderr=True, display_error=True, fl_remote=None
+    ):
         """
         Call rclone. If streaming, will write stdout & stderr to
         log. If logstderr, will always send stderr to log (default)
@@ -146,6 +148,31 @@ class Rclone:
                     out.append(line)
             out = "\n".join(out)
             err = ""  # Piped to stderr
+
+        ## Special for file listing. Not general purpose... Will count lines -1
+        if fl_remote:
+            with open(stdout.name, "rb") as fp:  # 'b' to avoid dealing with encoding
+                _c = 0
+                _t = time.time()
+                lines = []
+
+                while True:
+                    line = fp.readline()
+                    if not line:
+                        if proc.poll() is not None:
+                            break
+                        time.sleep(0.01)
+                        continue
+                    lines.append(line)
+                    if b"\n" in line:
+                        # normally would yield/return b'\n'.join(lines) but we don't
+                        # really care
+                        lines = []
+
+                        _c += 1
+                        if time.time() - _t > config.list_status_dt:
+                            log(f"Reading from {fl_remote}: File count {_c - 1}")
+                            _t = time.time()
 
         proc.wait()
         self.rclonetime += time.time() - t0
@@ -293,7 +320,10 @@ class Rclone:
         )
 
         cmd.append(remote)
-        files = json.loads(self.call(cmd))
+
+        files_raw = self.call(cmd, fl_remote="A")
+
+        files = json.loads(files_raw)
         debug(f"{AB}: Read {len(files)}")
         for file in files:
             for key in [

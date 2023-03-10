@@ -1,9 +1,12 @@
-__version__ = "20230215.0.BETA"
+__version__ = "20230310.0.BETA"
 LASTRCLONE = "1.61.1"  # This is the last version I tested with. Does *NOT* mean it won't work further.
 MINRCLONE = "1.59.0"  # Will not work prior to this
 
 import time
 import io
+from threading import Lock
+
+LOCK = Lock()
 
 # Global variables (not ideal but acceptable)
 DEBUG = False
@@ -44,12 +47,14 @@ class Log:
         lines = [t + line for line in lines]
 
         if debugmode and not DEBUG:  # Save it in case of error but do not print
-            self.hist.extend((False, line) for line in lines)
+            with LOCK:
+                self.hist.extend((False, line) for line in lines)
             return
 
         for line in lines:
-            self.hist.append((True, line))
-            print(line, **k0)
+            with LOCK:
+                self.hist.append((True, line))
+                print(line, **k0)
 
     __call__ = log
 

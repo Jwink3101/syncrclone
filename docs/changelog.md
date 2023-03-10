@@ -2,6 +2,11 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20230310.0.BETA
+
+- File listing status updates! New option `list_status_dt` (default 10s) to print a status update whole listing files. Great for slow remotes.
+- Bug Fix: Better error message when can't find `.syncrclone/config.py` in local mode
+
 ## 20230215.0.BETA
 
 - Bug Fix: Closes #28. Parsing versions gives non critical errors if it can't.

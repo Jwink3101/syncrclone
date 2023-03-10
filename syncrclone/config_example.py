@@ -175,9 +175,8 @@ set_lock = False
 # While transfers will follow the respective rclone flags  (e.g. ['--transfers','10'],
 # delete, backup, and move actions need more calls. There is some optimization but it
 # still may need more than one call. This allows it to happen in separate rclone calls.
-action_threads = (
-    1  # Some remotes do not like concurrent rclone calls so this is the default
-)
+# Some remotes do not like concurrent rclone calls so this is the default
+action_threads = 1
 # action_threads = __CPU_COUNT__ // 1.5
 # action_threads = 4
 
@@ -220,6 +219,11 @@ avoid_relist = True
 # doesn't support server-side copy or move.
 renamesA = None
 renamesB = None
+
+## Status
+# Set the time for status updates while listing slower remotes. Note that for transfer
+# status, use rclone_flags = ['--stats','10'] or the like.
+list_status_dt = 10  # sec
 
 ## Logs
 

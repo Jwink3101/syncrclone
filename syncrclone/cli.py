@@ -20,6 +20,10 @@ class ConfigError(ValueError):
     pass
 
 
+class NotAnSRCDirectoryError(ValueError):
+    pass
+
+
 class Config:
     def __init__(self, configpath=None):
         log(f"syncrclone ({__version__})")
@@ -141,6 +145,7 @@ class Config:
             os.makedirs(self._config["tempdir"])
         except OSError:
             pass
+        log(f"temp dir: {repr(self._config['tempdir'])}")
 
         # To be deprecated
         if self._config["conflict_mode"].endswith("_tag"):
@@ -335,9 +340,7 @@ def cli(argv=None):
             else:
                 cliconfig.configpath = utils.search_upwards(cliconfig.configpath)
                 if not cliconfig.configpath:
-                    raise ValueError(
-                        "Could not find '.syncrclone/config.py' in specified path"
-                    )
+                    raise NotAnSRCDirectoryError()
                 debug(f"Found config: '{cliconfig.configpath}'")
 
         config = Config(cliconfig.configpath)
@@ -388,6 +391,14 @@ def cli(argv=None):
             log(
                 f"WARNING (unlogged): Could not remote tempdir {repr(r.config.tempdir)}"
             )
+    except NotAnSRCDirectoryError:
+        msg = (
+            "ERROR: Could not find ''.syncrclone/config.py' in the specified or "
+            "implied path.\nEXITING"
+        )
+        log(msg, file=sys.stdout, flush=True)
+        sys.exit(2)
+
     except Exception as E:
         tmpdir = config.tempdir
         print(
