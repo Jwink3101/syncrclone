@@ -581,7 +581,7 @@ class Rclone:
             if config.backup_with_copy is None:
                 cmd[0] = "copy" if self.copy_support(AB) else "move"
                 debug(f"Automatic Copy Support: {cmd[0]}")
-            elif onfig.backup_with_copy:
+            elif config.backup_with_copy:
                 cmd[0] = "copy"
                 debug("Always using copy")
             else:
