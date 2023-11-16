@@ -31,7 +31,8 @@ except ImportError:
 
         return memoizer
 
-
+# Note to future self: Do not use this in other applications. See
+# DFB's parser which is much better
 def RFC3339_to_unix(timestr):
     """
     Parses RFC3339 into a unix time

@@ -2,6 +2,11 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20231116.0.BETA
+
+- Changed the version check to using the `rc` interface so it is JSON. Still in a try/except but way less likely to cause an issue.
+- Minor bug fixes including the listing progress always showing "A" regardless
+
 ## 20230310.0.BETA
 
 - File listing status updates! New option `list_status_dt` (default 10s) to print a status update whole listing files. Great for slow remotes.

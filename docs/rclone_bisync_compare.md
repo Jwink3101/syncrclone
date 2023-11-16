@@ -4,7 +4,7 @@
 
 Let's be 100% clear and upfront. **I AM BIASED**. I wrote [syncrclone](https://github.com/Jwink3101/syncrclone) to fill a need not met by [bisync](https://rclone.org/bisync/) / [rclonesync-v2](https://github.com/cjnaz/rclonesync-V2). 
 
-Additionally, both are great tools and I am not disparaching  the hard work of the various developers! The thing to remember is that bi-directional syncronization is *fundamentally* harder than mirroring because you *need* to keep the state. And therefore, it is also more opinionated.
+Additionally, both are great tools and I am not disparaging  the hard work of the various developers! The thing to remember is that bi-directional syncronization is *fundamentally* harder than mirroring because you *need* to keep the state. And therefore, it is also more opinionated.
 
 rclone bisync is based on rclonesync-v2. So I will just say bisync even though some of this is experiance from the other
 

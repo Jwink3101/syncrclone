@@ -78,13 +78,13 @@ class Rclone:
         but it also isn't critical so wrap everything in a try block.
         """
         log("rclone version:")
-        res = self.call(["--version"], stream=True)
+        ver = json.loads(self.call(["rc", "--loopback", "core/version"], stream=True))
         try:
-            rever = re.search(r"^rclone v?(.*)$", res, flags=re.MULTILINE)
-            ver = rever.group(1)  # Will raise attribute error if could not parse
-            if tuple(map(int, ver.split("."))) < tuple(map(int, MINRCLONE.split("."))):
+            decomposed = tuple(ver["decomposed"])
+            dtxt = ".".join(decomposed)
+            if decomposed < tuple(map(int, MINRCLONE.split("."))):
                 raise RcloneVersionError(
-                    f"Must use rclone >= {MINRCLONE}. Currently using {ver}"
+                    f"Must use rclone >= {MINRCLONE}. Currently using {dtxt}"
                 )
         except RcloneVersionError:
             raise
@@ -321,7 +321,7 @@ class Rclone:
 
         cmd.append(remote)
 
-        files_raw = self.call(cmd, fl_remote="A")
+        files_raw = self.call(cmd, fl_remote=AB)
 
         files = json.loads(files_raw)
         debug(f"{AB}: Read {len(files)}")
