@@ -1,4 +1,4 @@
-__version__ = "20231116.0.BETA"
+__version__ = "20231117.0.BETA"
 LASTRCLONE = "1.64.2"  # This is the last version I tested with. Does *NOT* mean it won't work further.
 MINRCLONE = "1.59.0"  # Will not work prior to this
 

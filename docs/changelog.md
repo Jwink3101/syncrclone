@@ -2,6 +2,12 @@
 
 This will likely get wiped when I go out of beta. 
 
+## 20231117.0.BETA
+
+- Made it more clear that the `name` **must be unique per pair** and changed the default code to accomplish this. New code that can be added is 
+    - `name += hashlib.md5(f"{remoteA}{remoteB}".encode()).hexdigest()`
+- Minor fix for new version number parsing
+
 ## 20231116.0.BETA
 
 - Changed the version check to using the `rc` interface so it is JSON. Still in a try/except but way less likely to cause an issue.

@@ -81,7 +81,7 @@ class Rclone:
         ver = json.loads(self.call(["rc", "--loopback", "core/version"], stream=True))
         try:
             decomposed = tuple(ver["decomposed"])
-            dtxt = ".".join(decomposed)
+            dtxt = ".".join(f"{d}" for d in decomposed)
             if decomposed < tuple(map(int, MINRCLONE.split("."))):
                 raise RcloneVersionError(
                     f"Must use rclone >= {MINRCLONE}. Currently using {dtxt}"

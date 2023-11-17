@@ -12,6 +12,17 @@ Example: `--exclude myfile` will be ['--exclude','myfile']
 
 This is *ALWAYS* evaluated from the parent of this file.
 
+The following variables are also defined:
+
+    log             : Print to the log file. Or just use print
+    debug           : Print to the debug log (or log when --debug)
+    __file__        : Absolute path of the config file
+    __dir__         : dirname of __file__
+    __CPU_COUNT__   : os.cpu_count()
+
+And the following modules:
+    os, hashlib, subprocess, time
+
 """
 ## Remotes:
 
@@ -38,10 +49,22 @@ remoteB = "<<MUST SPECIFY>>"
 workdirA = None  # <remoteA>/.syncrclone
 workdirB = None  # <remoteB>/.syncrclone
 
-# Names are needed so that one directory can sync to OR from multiple
-# locations. Names should be unique. The default below is randomly
-# set.
+# Names are used to store previous lists. They MUST BE UNIQUE for any given
+# pair of remotes. The default code here will use a random name + md5(workdirs)
+# but can be set with environment variables or other means.
+#
+# Examples:
+#   # Set in environment
+#   name = os.environ['syncrclonename'] # Set in .bashrc or the like
+#
+#   # Based on hostname
+#   name = subprocess.check_output('hostname').decode().strip()
+#
+#   # String or above plus remote names. This is also the default code
+#   name = "set this or use the above"
+#   name += hashlib.md5(f"{remoteA}{remoteB}".encode()).hexdigest()
 name = "__RANDOM__"
+name += hashlib.md5(f"{remoteA}{remoteB}".encode()).hexdigest()
 
 ## rclone flags
 
@@ -280,7 +303,7 @@ stop_on_shell_error = False
 # NOTE: It is *highly* suggested that you use something unique for each config and/or
 #       run so as to not clobber each other. See (commented) suggestion
 tempdir = None  # tempfile.TemporaryDirectory().name
-# import time; tempdir = f"/tmp/{name}/{time.time_ns()}
+# tempdir = f"/tmp/{name}/{time.time_ns()}
 
 #######
 # This should only be changed by the user when migrating from an older config

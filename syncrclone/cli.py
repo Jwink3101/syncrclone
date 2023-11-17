@@ -5,6 +5,7 @@ import os
 import random
 import warnings
 import shutil
+import hashlib, subprocess, time
 
 _showwarning = warnings.showwarning  # store this
 
@@ -80,6 +81,12 @@ class Config:
         self._config["__file__"] = os.path.abspath(self._configpath)
         self._config["__dir__"] = os.path.dirname(self._config["__file__"])
         self._config["__CPU_COUNT__"] = os.cpu_count()
+
+        # modules
+        self._config["os"] = os
+        self._config["subprocess"] = subprocess
+        self._config["hashlib"] = hashlib
+        self._config["time"] = time
 
         exec(self._template, self._config)  # Only reset if reading
 

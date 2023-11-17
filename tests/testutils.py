@@ -78,9 +78,10 @@ class Tester:
 
     def write_config(self):
         self.config.local_log_dest = "logs/"
+        MODNAMES = {"os", "hashlib", "subprocess", "time"}
         with open(self.config._configpath, "wt") as file:
             for key, var in self.config._config.items():
-                if key.startswith("_"):
+                if key.startswith("_") or key in MODNAMES:
                     continue
 
                 file.write(f"{key} = {repr(var)}\n")
